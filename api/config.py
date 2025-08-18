@@ -1,6 +1,9 @@
+
 """
 This module contains the configuration for the text2sql module.
 """
+
+
 
 import dataclasses
 from typing import Union
@@ -54,6 +57,9 @@ class Config:
     COMPLETION_MODEL = "azure/gpt-4.1"
     VALIDATOR_MODEL = "azure/gpt-4.1"
     TEMPERATURE = 0
+    POSTGRES_MAX_ROWS: int = 500
+    POSTGRES_MAX_DISTINCT: int = 100
+    POSTGRES_UNIQUENESS_THRESHOLD: float = 0.5
     # client = boto3.client('sts')
     # AWS_PROFILE = os.getenv("aws_profile_name")
     # AWS_REGION = os.getenv("aws_region_name")

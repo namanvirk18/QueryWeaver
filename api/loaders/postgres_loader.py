@@ -1,9 +1,10 @@
 """PostgreSQL loader for loading database schemas into FalkorDB graphs."""
 
+import re
 import datetime
 import decimal
 import logging
-import re
+from api.config import Config
 from typing import Tuple, Dict, Any, List
 
 import psycopg2
@@ -243,12 +244,14 @@ class PostgresLoader(BaseLoader):
             )
             rows_count, distinct_count = cursor.fetchone()
 
-            max_rows = 500
-            max_distinct = 100
+                
+            max_rows = Config.POSTGRES_MAX_ROWS
+            max_distinct = Config.POSTGRES_MAX_DISTINCT
+            uniqueness_threshold = Config.POSTGRES_UNIQUENESS_THRESHOLD
 
             if 0 < rows_count < max_rows and distinct_count < max_distinct:
                 uniqueness_value = distinct_count / rows_count
-                if uniqueness_value < 0.5:
+                if uniqueness_value < uniqueness_threshold:
                     cursor.execute(
                         f"SELECT DISTINCT {col_name} FROM {table_name};"
                     )
