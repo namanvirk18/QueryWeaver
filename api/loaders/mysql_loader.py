@@ -44,6 +44,33 @@ class MySQLLoader(BaseLoader):
     ]
 
     @staticmethod
+    def _execute_count_query(cursor, table_name: str, col_name: str) -> Tuple[int, int]:
+        """
+        Execute query to get total count and distinct count for a column.
+        MySQL implementation returning counts from dictionary-style results.
+        """
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) AS total_count,
+                   COUNT(DISTINCT {col_name}) AS distinct_count
+            FROM {table_name};
+            """
+        )
+        output = cursor.fetchall()
+        first_result = output[0]
+        return first_result['total_count'], first_result['distinct_count']
+
+    @staticmethod
+    def _execute_distinct_query(cursor, table_name: str, col_name: str) -> List[Any]:
+        """
+        Execute query to get distinct values for a column.
+        MySQL implementation handling dictionary-style results.
+        """
+        cursor.execute(f"SELECT DISTINCT {col_name} FROM {table_name};")
+        distinct_results = cursor.fetchall()
+        return [row[col_name] for row in distinct_results if row[col_name] is not None]
+
+    @staticmethod
     def _serialize_value(value):
         """
         Convert non-JSON serializable values to JSON serializable format.
