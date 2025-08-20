@@ -15,6 +15,7 @@ import {
     setupThemeToggle,
     setupToolbar,
     handleWindowResize,
+    setupCustomDropdown
 } from './modules/ui.js';
 import { setupAuthenticationModal, setupDatabaseModal } from './modules/modals.js';
 import { showGraph } from './modules/schema.js';
@@ -134,6 +135,7 @@ function setupUIComponents() {
     setupAuthenticationModal();
     setupDatabaseModal();
     setupToolbar();
+    setupCustomDropdown();
 }
 
 function loadInitialData() {
