@@ -1,6 +1,62 @@
 {# Side Database Schema view #}
-<div id="schema-container" class="sidebar-container">    
+<div id="schema-container" class="sidebar-container">
     <div id="schema-content">
-        <div class="horizontal-separator">asdfasfdsdafsadf</div>
+        <div id="graph"></div>
+
+
+        <script>
+            const myData = {
+                nodes: [
+                    { id: 'users', name: 'users', columns: ['id', 'name', 'email'] },
+                    { id: 'orders', name: 'orders', columns: ['id', 'user_id', 'date'] },
+                    { id: 'products', name: 'products', columns: ['id', 'name', 'price'] },
+                    { id: 'order_items', name: 'order_items', columns: ['id', 'order_id', 'product_id'] }
+                ],
+                links: [
+                    { source: 'users', target: 'orders' },
+                    { source: 'orders', target: 'order_items' },
+                    { source: 'products', target: 'order_items' }
+                ]
+            };
+
+            const graphElement = document.getElementById('graph');
+
+            // Use a variable for the graph instance
+            const Graph = ForceGraph()(graphElement)
+                .graphData(myData)
+                .nodeCanvasObject((node, ctx, globalScale) => {
+                    const nodeSize = 80;
+                    const fontSize = 10;
+                    const padding = 5;
+                    const textColor = '#333';
+                    const fillColor = '#eee';
+                    const strokeColor = '#222';
+
+                    // Draw the rectangle (the box)
+                    ctx.fillStyle = fillColor;
+                    ctx.strokeStyle = strokeColor;
+                    ctx.lineWidth = 1;
+                    ctx.fillRect(node.x - nodeSize / 2, node.y - nodeSize / 2, nodeSize, nodeSize);
+                    ctx.strokeRect(node.x - nodeSize / 2, node.y - nodeSize / 2, nodeSize, nodeSize);
+
+                    // Add the table name
+                    ctx.fillStyle = textColor;
+                    ctx.font = `${fontSize}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(node.name, node.x, node.y - nodeSize / 2 + padding + fontSize / 2);
+
+                    // Add the attributes
+                    ctx.font = `${fontSize * 0.8}px Arial`;
+                    ctx.textAlign = 'left';
+                    const columnYStart = node.y - nodeSize / 2 + padding * 2 + fontSize * 1.5;
+                    node.columns.forEach((column, index) => {
+                        ctx.fillText(column, node.x - nodeSize / 2 + padding, columnYStart + index * fontSize * 1.2);
+                    });
+                });
+
+            // Set the graph to fit the window size
+            Graph.width(window.innerWidth).height(window.innerHeight);
+        </script>
     </div>
 </div>
