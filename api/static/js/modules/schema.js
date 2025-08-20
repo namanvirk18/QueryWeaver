@@ -130,10 +130,12 @@ export function showGraph(data) {
         // ForceGraph will use its default forces in this case.
     }
 
+    const el = document.getElementById('schema-graph');
+    const { width, height } = el.getBoundingClientRect();
     // Stop when layout stabilizes and set canvas size
     Graph.onEngineStop(() => {
-        console.log('Engine stopped, layout stabilized.');
-    }).width(window.innerWidth).height(window.innerHeight);
+        console.debug('Engine stopped, layout stabilized.');
+    }).width(width).height(height);
 
     // Optional: add directional arrows on links to make edges clearer
     // ensure link color matches canvas-drawn edges
