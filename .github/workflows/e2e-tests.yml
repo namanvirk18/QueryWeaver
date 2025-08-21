@@ -37,14 +37,18 @@ jobs:
         python -m pip install --upgrade pip
         pip install pipenv
 
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
     - name: Install dependencies
       run: |
-        pipenv sync --dev
+        make install
 
-    - name: Install Playwright browsers
+    - name: Setup development environment
       run: |
-        pipenv run playwright install chromium
-        pipenv run playwright install-deps
+        make setup-dev
 
     - name: Create test environment file
       run: |
@@ -63,7 +67,7 @@ jobs:
 
     - name: Run E2E tests
       run: |
-        pipenv run pytest tests/e2e/ --browser chromium --video=on --screenshot=on
+        make test-e2e
       env:
         CI: true
 

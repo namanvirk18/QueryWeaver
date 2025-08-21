@@ -32,7 +32,7 @@ test-unit: ## Run unit tests only
 
 
 test-e2e: build-dev ## Run E2E tests headless
-	pipenv run python -m pytest tests/e2e/ --browser chromium
+	pipenv run python -m pytest tests/e2e/ --browser chromium --video=on --screenshot=on
 
 
 test-e2e-headed: build-dev ## Run E2E tests with browser visible
