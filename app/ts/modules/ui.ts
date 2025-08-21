@@ -2,7 +2,7 @@
  * UI components and interactions (TypeScript)
  */
 
-import { DOM } from './config.js';
+import { DOM } from './config';
 
 export function toggleContainer(container: HTMLElement, onOpen?: () => void) {
     const isMobile = window.innerWidth <= 768;
@@ -45,7 +45,7 @@ export function hideResetConfirmation() {
 
 export function handleResetConfirmation() {
     hideResetConfirmation();
-    import('./messages.js').then(({ initChat }) => {
+    import('./messages').then(({ initChat }) => {
         initChat();
     });
 }

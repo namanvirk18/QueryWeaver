@@ -2,10 +2,10 @@
  * Main application entry point (TypeScript)
  */
 
-import { DOM } from './modules/config.js';
-import { initChat } from './modules/messages.js';
-import { sendMessage, pauseRequest } from './modules/chat.js';
-import { loadGraphs, handleFileUpload, onGraphChange } from './modules/graphs.js';
+import { DOM } from './modules/config';
+import { initChat } from './modules/messages';
+import { sendMessage, pauseRequest } from './modules/chat';
+import { loadGraphs, handleFileUpload, onGraphChange } from './modules/graphs';
 import {
     toggleContainer,
     showResetConfirmation,
@@ -16,9 +16,9 @@ import {
     setupToolbar,
     handleWindowResize,
     setupCustomDropdown
-} from './modules/ui.js';
-import { setupAuthenticationModal, setupDatabaseModal } from './modules/modals.js';
-import { showGraph } from './modules/schema.js';
+} from './modules/ui';
+import { setupAuthenticationModal, setupDatabaseModal } from './modules/modals';
+import { showGraph } from './modules/schema';
 
 async function loadAndShowGraph(selected: string | undefined) {
     if (!selected) return;

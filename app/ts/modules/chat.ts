@@ -2,8 +2,8 @@
  * Chat API and messaging functionality (TypeScript)
  */
 
-import { DOM, state, MESSAGE_DELIMITER } from './config.js';
-import { addMessage, removeLoadingMessage, moveLoadingMessageToBottom } from './messages.js';
+import { DOM, state, MESSAGE_DELIMITER } from './config';
+import { addMessage, removeLoadingMessage, moveLoadingMessageToBottom } from './messages';
 
 export async function sendMessage() {
     const message = (DOM.messageInput?.value || '').trim();

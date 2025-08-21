@@ -2,8 +2,8 @@
  * Graph loading and management functionality (TypeScript)
  */
 
-import { DOM } from './config.js';
-import { addMessage, initChat } from './messages.js';
+import { DOM } from './config';     
+import { addMessage, initChat } from './messages';
 
 export function loadGraphs() {
     const isAuthenticated = (window as any).isAuthenticated !== undefined ? (window as any).isAuthenticated : false;
