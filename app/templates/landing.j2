@@ -26,18 +26,17 @@
       <div class="demo-label">Your Business Question:</div>
       <div class="demo-question">Which customers from Germany who bought 'Chai' also have an open support ticket in Salesforce?</div>
 
-      <div class="demo-label">Generated SQL:</div>
-      <pre class="demo-sql">
-SELECT c.companyName
-FROM customers c
-JOIN orders o ON c.customerID = o.customerID
-JOIN order_details od ON o.orderID = od.orderID
-JOIN products p ON od.productID = p.productID
-JOIN salesforce_tickets st ON c.customerID = st.customerID
-WHERE c.country = 'Germany'
-  AND p.productName = 'Chai'
-  AND st.status = 'Open';
-      </pre>
+      <div class="demo-sql-header">
+        <div class="demo-label">Generated SQL:</div>
+        <div class="demo-success" style="display:none;">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="8" r="8" fill="#10B981"/>
+            <path d="M5.5 8L7 9.5L10.5 6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Success</span>
+        </div>
+      </div>
+      <pre class="demo-sql"></pre>
 
       <div class="demo-cta">
         <button id="demo-next" class="btn-full" type="button">Try another question</button>
@@ -63,6 +62,7 @@ WHERE c.country = 'Germany'
         let idx = 0;
         const qEl = document.querySelector('.demo-question');
         const sEl = document.querySelector('.demo-sql');
+        const successEl = document.querySelector('.demo-success');
         const btn = document.getElementById('demo-next');
 
         let typingTimer = null;
@@ -75,10 +75,13 @@ WHERE c.country = 'Germany'
             sEl.classList.remove('typing');
             sEl.textContent = ex.sql;
           }
+          if(successEl) successEl.style.display = 'flex';
         }
 
         function typeSql(text){
           if(!sEl) return;
+          // hide success while typing
+          if(successEl) successEl.style.display = 'none';
           // stop any previous typing
           if(typingTimer) {
             clearInterval(typingTimer);
@@ -94,6 +97,8 @@ WHERE c.country = 'Germany'
               clearInterval(typingTimer);
               typingTimer = null;
               sEl.classList.remove('typing');
+              // show success when typing completes
+              if(successEl) successEl.style.display = 'flex';
             }
           }, typingSpeed);
         }
@@ -108,8 +113,10 @@ WHERE c.country = 'Germany'
           });
         }
 
-        // initial render: show full first example without typing
-        renderFull(0);
+        // initial render: use typing animation for first example too
+        const firstExample = examples[0];
+        if(qEl) qEl.textContent = firstExample.q;
+        typeSql(firstExample.sql);
       })();
     </script>
     </div>

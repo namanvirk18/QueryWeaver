@@ -33,9 +33,13 @@
 .demo-inner{background:var(--bg-tertiary);border-radius:8px;padding:1rem;border:1px solid var(--falkor-border-tertiary)}
 .demo-label{font-size:0.9rem;color:var(--text-secondary);margin-bottom:0.5rem}
 
+.demo-sql-header{display:flex;justify-content:space-between;align-items:center;margin-top:1rem}
+.demo-success{display:flex;align-items:center;gap:0.5rem;color:#10B981;font-size:0.9rem;font-weight:600}
+.demo-success svg{flex-shrink:0}
+
 /* Use the theme's secondary surface for the white/black boxes so text contrast is correct in both themes */
 .demo-question{background:var(--falkor-secondary);border-radius:6px;padding:0.75rem 1rem;border:1px solid var(--falkor-border-tertiary);color:var(--text-primary);height:120px;white-space:pre-wrap;font-family:monospace;font-size:0.95rem;overflow:auto;line-height:1.3}
-.demo-sql{background:var(--falkor-secondary);border-radius:6px;padding:0.75rem 1rem;border:1px solid var(--falkor-border-tertiary);color:var(--text-primary);margin-top:0.8rem;font-size:0.9rem;overflow:auto;height:200px;line-height:1.25}
+.demo-sql{background:var(--falkor-secondary);border-radius:6px;padding:0.75rem 1rem;border:1px solid var(--falkor-border-tertiary);color:var(--text-primary);margin-top:0.5rem;font-size:0.9rem;overflow:auto;height:200px;line-height:1.25}
 .demo-sql.typing{position:relative}
 .demo-sql.typing::after{
   content: '';
