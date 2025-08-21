@@ -55,8 +55,8 @@ jobs:
         cp .env.example .env
         echo "FALKORDB_HOST=localhost" >> .env
         echo "FALKORDB_PORT=6379" >> .env
-  echo "FASTAPI_SECRET_KEY=test-secret-key-for-ci" >> .env
-  echo "FASTAPI_DEBUG=False" >> .env
+        echo "FLASK_SECRET_KEY=test-secret-key-for-ci" >> .env
+        echo "FLASK_DEBUG=False" >> .env
 
     - name: Wait for FalkorDB
       run: |

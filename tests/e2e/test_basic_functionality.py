@@ -90,5 +90,7 @@ class TestBasicFunctionality:
 
         # Should handle 404 gracefully
         # Could be 404 page or redirect to home
-        response_status = page.evaluate("() => window.fetch('/nonexistent-route').then(r => r.status)")
-        assert response_status in [404, 302, 200]  # Various valid responses
+        response_status = page.evaluate(
+            "() => window.fetch('/nonexistent-route').then(r => r.status)"
+        )
+        assert response_status in [404, 302, 200]

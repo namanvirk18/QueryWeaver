@@ -86,9 +86,9 @@ export function showGraph(data: any) {
                         const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
                         return L > 0.6 ? '#111' : '#ffffff';
                     }
-                } catch (e) {
-                    // ignore
-                }
+                    } catch {
+                        // ignore
+                    }
                 return '#ffffff';
             };
 
@@ -127,7 +127,7 @@ export function showGraph(data: any) {
                     const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
                     return L > 0.6 ? '#111' : '#ffffff';
                 }
-            } catch (e) { /* empty */ }
+            } catch { /* empty */ }
             return '#ffffff';
         };
         const edgeColor = (() => {
@@ -139,7 +139,7 @@ export function showGraph(data: any) {
 
         Graph.linkColor(() => edgeColor)
              .linkDirectionalArrowLength(6).linkDirectionalArrowRelPos(1);
-    } catch (e) {
+    } catch {
         Graph.linkDirectionalArrowLength(6).linkDirectionalArrowRelPos(1);
     }
 }
