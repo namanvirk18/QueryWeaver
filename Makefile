@@ -23,8 +23,8 @@ build-dev:
 build-prod:
 	npm --prefix ./app run build
 
-test: build-dev ## Run all tests
-	test-unit test-e2e 
+test: build-dev test-unit test-e2e ## Run all tests
+	
 
 
 test-unit: ## Run unit tests only

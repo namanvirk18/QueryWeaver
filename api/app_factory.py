@@ -31,7 +31,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             # Remove /static/ prefix to get the actual path
             filename = request.url.path[len(self.STATIC_PREFIX):]
             # Basic security check for directory traversal
-            if '../' in filename or filename.endswith('/'):
+            if not filename or '../' in filename or filename.endswith('/'):
                 return JSONResponse(
                     status_code=403,
                     content={"detail": "Forbidden"}
