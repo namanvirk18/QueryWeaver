@@ -18,7 +18,7 @@ class HomePage(BasePage):
 
     def navigate_to_home(self):
         """Navigate to the home page."""
-        self.navigate_to("/")
+        self.navigate_to("/chat")
         self.wait_for_page_load()
 
     def is_authenticated(self):

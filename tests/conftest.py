@@ -8,17 +8,17 @@ import requests
 
 
 @pytest.fixture(scope="session")
-def flask_app():
-    """Start the Flask application for testing."""
+def fastapi_app():
+    """Start the FastAPI application for testing."""
     import os
 
     # Get the project root directory (parent of tests directory)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(current_dir)
 
-    # Start the Flask app using pipenv
+    # Start the FastAPI app using pipenv
     process = subprocess.Popen([
-        "pipenv", "run", "flask", "--app", "api.index", "run",
+        "pipenv", "run", "uvicorn", "api.index:app",
         "--host", "localhost", "--port", "5000"
     ], cwd=project_root)
 
@@ -33,7 +33,7 @@ def flask_app():
             time.sleep(1)
     else:
         process.terminate()
-        raise RuntimeError("Flask app failed to start")
+        raise RuntimeError("FastAPI app failed to start")
 
     yield "http://localhost:5000"
 
@@ -43,9 +43,9 @@ def flask_app():
 
 
 @pytest.fixture
-def app_url(flask_app):
+def app_url(fastapi_app):
     """Provide the base URL for the application."""
-    return flask_app
+    return fastapi_app
 
 
 @pytest.fixture

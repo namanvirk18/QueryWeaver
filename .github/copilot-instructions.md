@@ -4,14 +4,14 @@ This file provides essential information for coding agents working with the Quer
 
 ## Repository Overview
 
-QueryWeaver is an open-source Text2SQL tool that transforms natural language into SQL using graph-powered schema understanding. Built with Python/Flask and FalkorDB (graph database), it provides a web interface for natural language database queries with OAuth authentication.
+QueryWeaver is an open-source Text2SQL tool that transforms natural language into SQL using graph-powered schema understanding. Built with Python/FastAPI and FalkorDB (graph database), it provides a web interface for natural language database queries with OAuth authentication.
 
 **Key Technologies:**
-- **Backend**: Python 3.12+, Flask 3.1+, FalkorDB (Redis-based graph database)
+- **Backend**: Python 3.12+, FastAPI 0.115.0+, FalkorDB (Redis-based graph database)
 - **AI/ML**: LiteLLM with Azure OpenAI/OpenAI integration for text-to-SQL generation
 - **Testing**: pytest for unit tests, Playwright for E2E testing
 - **Dependencies**: pipenv for package management
-- **Authentication**: Flask-Dance with Google/GitHub OAuth
+- **Authentication**: authlib with Google/GitHub OAuth
 - **Deployment**: Docker support, Vercel configuration
 
 **Repository Size**: ~50 Python files, medium complexity web application with comprehensive test suite.
@@ -81,11 +81,11 @@ make lint
 ```bash
 # Development server with debug mode
 make run-dev
-# OR manually: pipenv run flask --app api.index run --debug
+# OR manually: pipenv run uvicorn api.index:app --host "localhost" --port "5000" --reload
 
 # Production mode
 make run-prod
-# OR manually: pipenv run flask --app api.index run
+# OR manually: pipenv run uvicorn api.index:app --host "localhost" --port "5000"
 ```
 
 Important: If you're preparing a production deployment or have changed frontend code, run `make build-prod` (or `make build-dev` for a development build) first to produce the static bundle used by the app.
@@ -125,7 +125,7 @@ make clean
 **CRITICAL**: Create `.env` file from `.env.example` and configure these essential variables:
 
 ```bash
-# REQUIRED for Flask to start
+# REQUIRED for FastAPI to start
 FLASK_SECRET_KEY=your_super_secret_key_here
 FLASK_DEBUG=False
 
@@ -188,7 +188,7 @@ pipenv run pytest tests/ -k "not e2e"
 ```
 
 ### 5. Port Conflicts
-**Error**: Flask app fails to start on port 5000
+**Error**: FastAPI app fails to start on port 5000
 **Solution**: Check if port is in use, kill conflicting processes or change port
 
 ## Project Architecture & Layout
@@ -196,7 +196,7 @@ pipenv run pytest tests/ -k "not e2e"
 ### Core Application Structure
 ```
 api/                          # Main application package
-├── index.py                 # Flask application entry point
+├── index.py                 # FastAPI application entry point
 ├── app_factory.py           # Application factory pattern
 ├── config.py                # AI model configuration and prompts
 ├── agents/                  # AI agents for query processing
@@ -204,7 +204,7 @@ api/                          # Main application package
 │   ├── relevancy_agent.py   # Schema relevance detection
 │   └── follow_up_agent.py   # Follow-up question generation
 ├── auth/                    # Authentication modules
-├── routes/                  # Flask route handlers
+├── routes/                  # FastAPI route handlers
 │   ├── auth.py             # Authentication routes
 │   ├── graphs.py           # Graph/database routes
 │   └── database.py         # Database management routes
@@ -234,7 +234,7 @@ tests/
 - `vercel.json`: Deployment configuration
 
 ### Key Dependencies
-- **Flask ecosystem**: Flask, Flask-Dance (OAuth)
+- **FastAPI ecosystem**: FastAPI, Authlib (OAuth)
 - **Database**: falkordb, psycopg2-binary (PostgreSQL support)
 - **AI/ML**: litellm (LLM abstraction), boto3 (AWS)
 - **Development**: pytest, pylint, playwright
@@ -290,7 +290,7 @@ Before submitting any changes, run these validation steps:
 ## Key Files to Understand
 
 ### Application Entry Points
-- `api/index.py`: Main Flask app entry point
+- `api/index.py`: Main FastAPI app entry point
 - `api/app_factory.py`: Application factory with OAuth setup (lines 1-50 contain core configuration)
 
 ### Configuration & Prompts
@@ -300,7 +300,7 @@ Before submitting any changes, run these validation steps:
 ### Core Logic
 - `api/agents/`: Contains the AI agents that process natural language queries
 - `api/loaders/`: Database schema loading and graph construction
-- `api/routes/`: Flask routes for web interface and API
+- `api/routes/`: FastAPI routes for web interface and API
 
 ### Testing Infrastructure
 - `tests/conftest.py`: Pytest fixtures and test configuration

@@ -6,13 +6,11 @@ import secrets
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from api.auth.oauth_handlers import setup_oauth_handlers
 from api.routes.auth import auth_router, init_auth
 from api.routes.graphs import graphs_router
 from api.routes.database import database_router
@@ -34,8 +32,11 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             filename = request.url.path[len(self.STATIC_PREFIX):]
             # Basic security check for directory traversal
             if '../' in filename or filename.endswith('/'):
-                raise HTTPException(status_code=400, detail="Bad request")
-        
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Forbidden"}
+                )
+
         response = await call_next(request)
         return response
 
@@ -59,7 +60,7 @@ def create_app():
         https_only=False,  # allow http on localhost in development
         max_age=60 * 60 * 24 * 14,  # 14 days - measured by seconds
     )
-    
+
     # Add security middleware
     app.add_middleware(SecurityMiddleware)
 
