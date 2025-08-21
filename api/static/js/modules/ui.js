@@ -4,22 +4,31 @@
 
 import { DOM } from './config.js';
 
-export function toggleMenu() {
+export function toggleContainer(container, onOpen) {
     // Check if we're on mobile (768px breakpoint to match CSS)
     const isMobile = window.innerWidth <= 768;
-    
-    if (!DOM.menuContainer.classList.contains('open')) {
-        DOM.menuContainer.classList.add('open');
-        DOM.sideMenuButton.style.display = 'none';
+
+    // find all the containers with class "sidebar-container" and if open remove open
+    const allContainers = document.querySelectorAll('.sidebar-container');
+    allContainers.forEach((c) => {
+        if (c !== container && c.classList.contains('open')) {
+            c.classList.remove('open');
+        }
+    });
+
+    if (!container.classList.contains('open')) {
+        container.classList.add('open');
         
         // Only adjust padding on desktop, not mobile (mobile uses overlay)
         if (!isMobile) {
             DOM.chatContainer.style.paddingRight = '10%';
             DOM.chatContainer.style.paddingLeft = '10%';
         }
+        if (onOpen) {
+            onOpen();
+        }
     } else {
-        DOM.menuContainer.classList.remove('open');
-        DOM.sideMenuButton.style.display = 'block';
+        container.classList.remove('open');
         
         // Only adjust padding on desktop, not mobile (mobile uses overlay)
         if (!isMobile) {
@@ -129,24 +138,66 @@ export function setupThemeToggle() {
     }
 }
 
+export function setupToolbar() {
+    // Keyboard navigation: roving tabindex within #toolbar-buttons
+    const toolbar = document.getElementById('toolbar-buttons');
+    if (toolbar) {
+        const buttons = Array.from(toolbar.querySelectorAll('button.toolbar-button'));
+        // Ensure first button is tabbable
+        buttons.forEach((b, i) => b.setAttribute('tabindex', i === 0 ? '0' : '-1'));
+
+        toolbar.addEventListener('keydown', (e) => {
+            const focused = document.activeElement;
+            const idx = buttons.indexOf(focused);
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                const next = buttons[(idx + 1) % buttons.length];
+                if (next) {
+                    buttons.forEach(b => b.setAttribute('tabindex', '-1'));
+                    next.setAttribute('tabindex', '0');
+                    next.focus();
+                }
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                const prev = buttons[(idx - 1 + buttons.length) % buttons.length];
+                if (prev) {
+                    buttons.forEach(b => b.setAttribute('tabindex', '-1'));
+                    prev.setAttribute('tabindex', '0');
+                    prev.focus();
+                }
+            } else if (e.key === 'Enter' || e.key === ' ') {
+                // Activate the button
+                e.preventDefault();
+                if (focused) focused.click();
+            }
+        });
+    }
+}
+
 export function handleWindowResize() {
     const isMobile = window.innerWidth <= 768;
-    
-    // If menu is open and we switch to mobile, remove any desktop padding
-    if (isMobile && DOM.menuContainer.classList.contains('open')) {
-        DOM.chatContainer.style.paddingRight = '';
-        DOM.chatContainer.style.paddingLeft = '';
-    }
-    // If menu is open and we switch to desktop, apply desktop padding
-    else if (!isMobile && DOM.menuContainer.classList.contains('open')) {
-        DOM.chatContainer.style.paddingRight = '10%';
-        DOM.chatContainer.style.paddingLeft = '10%';
-    }
-    // If menu is closed and we're on desktop, ensure default desktop padding
-    else if (!isMobile && !DOM.menuContainer.classList.contains('open')) {
-        DOM.chatContainer.style.paddingRight = '20%';
-        DOM.chatContainer.style.paddingLeft = '20%';
-    }
+
+    // Find all the containers with class "sidebar-container" and if open remove open
+    const allContainers = document.querySelectorAll('.sidebar-container');
+    allContainers.forEach((c) => {
+        // If menu is open and we switch to mobile, remove any desktop padding
+        if (isMobile && c.classList.contains('open')) {
+            DOM.chatContainer.style.paddingRight = '';
+            DOM.chatContainer.style.paddingLeft = '';
+        }
+        // If menu is open and we switch to desktop, apply desktop padding
+        else if (!isMobile && c.classList.contains('open')) {
+            DOM.chatContainer.style.paddingRight = '10%';
+            DOM.chatContainer.style.paddingLeft = '10%';
+        }
+        // If menu is closed and we're on desktop, ensure default desktop padding
+        else if (!isMobile && !c.classList.contains('open')) {
+            DOM.chatContainer.style.paddingRight = '20%';
+            DOM.chatContainer.style.paddingLeft = '20%';
+        }
+    });
+
+
 }
 
 // Custom dropdown functionality

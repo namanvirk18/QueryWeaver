@@ -1,6 +1,6 @@
 /* Menu and Navigation Components */
 
-#menu-container {
+.sidebar-container {
   width: 0;
   min-width: 0;
   overflow: hidden;
@@ -16,16 +16,12 @@
   pointer-events: none;
 }
 
-#menu-container.open {
+.sidebar-container.open {
   width: 30dvw;
   padding: 20px;
+  left: 48px;
   visibility: visible;
   pointer-events: auto;
-}
-
-#menu-header {
-  display: flex;
-  flex-direction: row;
 }
 
 #menu-content {
@@ -34,24 +30,6 @@
   flex-direction: column;
   align-items: center;
   gap: 20px;
-}
-
-#side-menu-button {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-}
-
-#menu-button img {
-  rotate: 180deg;
-  filter: brightness(0) invert(1);
-}
-
-/* Menu user image styling */
-.menu-user-img {
-  width: 32px;
-  height: 32px;
-  object-fit: cover;
 }
 
 .menu-item {
@@ -183,6 +161,21 @@
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
   cursor: pointer;
+}
+
+/* Graph canvas container inside schema sidebar */
+#schema-graph {
+  width: 100%;
+  height: 100%; 
+  min-height: 300px;
+  background: transparent;
+  position: relative;
+}
+
+/* Ensure canvas inside ForceGraph fills the container */
+.force-graph-container, #schema-graph > canvas {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 #graph-select:focus {

@@ -19,25 +19,17 @@
 
 /* Menu Responsive */
 @media (max-width: 768px) {
-  #menu-container {
+  .sidebar-container {
     position: fixed;
     top: 0;
     left: 0;
     height: 100vh;
     z-index: 999;
   }
-  
-  #menu-container.open {
+
+  .sidebar-container.open {
     width: 80vw;
     padding: 15px;
-  }
-}
-
-/* Side Menu Button Responsive */
-@media (max-width: 768px) {
-  #side-menu-button {
-    top: 15px;
-    left: 15px;
   }
 }
 
@@ -129,14 +121,9 @@
     height: 40px;
   }
   
-  #theme-toggle-btn {
-    top: 15px;
-    right: 80px;
-  }
-  
   #github-link-btn {
     top: 15px;
-    right: 135px;
+    right: 60px;
     padding: 6px 8px;
     font-size: 12px;
     height: 40px;

@@ -49,6 +49,12 @@ def sanitize_query(query: str) -> str:
     """Sanitize the query to prevent injection attacks."""
     return query.replace('\n', ' ').replace('\r', ' ')[:500]
 
+def sanitize_log_input(value: str) -> str:
+    """Sanitize input for safe logging (remove newlines and carriage returns)."""
+    if not isinstance(value, str):
+        return str(value)
+    return value.replace('\n', ' ').replace('\r', ' ')
+
 @graphs_bp.route("")
 @token_required
 def list_graphs():
@@ -61,6 +67,105 @@ def list_graphs():
     filtered_graphs = [graph[len(f"{user_id}_"):]
                        for graph in user_graphs if graph.startswith(f"{user_id}_")]
     return jsonify(filtered_graphs)
+
+
+@graphs_bp.route("/<string:graph_id>/data", methods=["GET"])
+@token_required
+def get_graph_data(graph_id: str):
+    """Return all nodes and edges for the specified graph (namespaced to the user).
+
+    This endpoint returns a JSON object with two keys: `nodes` and `edges`.
+    Nodes contain a minimal set of properties (id, name, labels, props).
+    Edges contain source and target node names (or internal ids), type and props.
+    """
+    if not graph_id or not isinstance(graph_id, str):
+        return jsonify({"error": "Invalid graph_id"}), 400
+
+    graph_id = graph_id.strip()[:200]
+    namespaced = g.user_id + "_" + graph_id
+
+    try:
+        graph = db.select_graph(namespaced)
+    except Exception as e:
+        logging.error("Failed to select graph %s: %s", sanitize_log_input(namespaced), e)
+        return jsonify({"error": "Graph not found or database error"}), 404
+
+    # Build table nodes with columns and table-to-table links (foreign keys)
+    tables_query = """
+    MATCH (t:Table)
+    OPTIONAL MATCH (c:Column)-[:BELONGS_TO]->(t)
+    RETURN t.name AS table, collect(DISTINCT {name: c.name, type: c.type}) AS columns
+    """
+
+    links_query = """
+    MATCH (src_col:Column)-[:BELONGS_TO]->(src_table:Table),
+          (tgt_col:Column)-[:BELONGS_TO]->(tgt_table:Table),
+          (src_col)-[:REFERENCES]->(tgt_col)
+    RETURN DISTINCT src_table.name AS source, tgt_table.name AS target
+    """
+
+    try:
+        tables_res = graph.query(tables_query).result_set
+        links_res = graph.query(links_query).result_set
+    except Exception as e:
+        logging.error("Error querying graph data for %s: %s", sanitize_log_input(namespaced), e)
+        return jsonify({"error": "Failed to read graph data"}), 500
+
+    nodes = []
+    for row in tables_res:
+        try:
+            table_name, columns = row
+        except Exception:
+            continue
+        # Normalize columns: ensure a list of dicts with name/type
+        if not isinstance(columns, list):
+            columns = [] if columns is None else [columns]
+
+        normalized = []
+        for col in columns:
+            try:
+                # col may be a mapping-like object or a simple value
+                if not col:
+                    continue
+                # Some drivers may return a tuple or list for the collected map
+                if isinstance(col, (list, tuple)) and len(col) >= 2:
+                    # try to interpret as (name, type)
+                    name = col[0]
+                    ctype = col[1] if len(col) > 1 else None
+                elif isinstance(col, dict):
+                    name = col.get('name') or col.get('columnName')
+                    ctype = col.get('type') or col.get('dataType')
+                else:
+                    name = str(col)
+                    ctype = None
+
+                if not name:
+                    continue
+
+                normalized.append({"name": name, "type": ctype})
+            except Exception:
+                continue
+
+        nodes.append({
+            "id": table_name,
+            "name": table_name,
+            "columns": normalized,
+        })
+
+    links = []
+    seen = set()
+    for row in links_res:
+        try:
+            source, target = row
+        except Exception:
+            continue
+        key = (source, target)
+        if key in seen:
+            continue
+        seen.add(key)
+        links.append({"source": source, "target": target})
+
+    return jsonify({"nodes": nodes, "links": links})
 
 
 @graphs_bp.route("", methods=["POST"])
