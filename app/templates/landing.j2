@@ -1,0 +1,49 @@
+{% extends "base.j2" %}
+
+{% block title %}QueryWeaver — Natural language to SQL{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="landing-container">
+
+  <!-- Left hero -->
+  <section class="hero-left">
+    <h1 class="hero-title">Transform Plain<br/>English into Powerful<br/>SQL.</h1>
+    <p class="hero-sub">The intelligent AI solution that connects your business questions to data across multiple databases. Ask a question in plain English and get runnable SQL and visual results.</p>
+
+    <div class="hero-ctas">
+      <a href="{{ url_for('auth.chat') }}" class="btn-pill">Sign Up for Free</a>
+      <a href="{{ url_for('auth.login_google') }}" class="btn-ghost">Sign In</a>
+    </div>
+  </section>
+
+  <!-- Right demo card -->
+  <aside class="demo-card">
+    <div class="demo-inner">
+      <div class="demo-label">Your Business Question:</div>
+      <div class="demo-question">Which customers from Germany who bought 'Chai' also have an open support ticket in Salesforce?</div>
+
+      <div class="demo-label">Generated SQL:</div>
+      <pre class="demo-sql">
+SELECT c.companyName
+FROM customers c
+JOIN orders o ON c.customerID = o.customerID
+JOIN order_details od ON o.orderID = od.orderID
+JOIN products p ON od.productID = p.productID
+JOIN salesforce_tickets st ON c.customerID = st.customerID
+WHERE c.country = 'Germany'
+  AND p.productName = 'Chai'
+  AND st.status = 'Open';
+      </pre>
+
+      <div class="demo-cta">
+        <a href="{{ url_for('auth.chat') }}" class="btn-full">Try another question</a>
+      </div>
+    </div>
+  </aside>
+
+</div>
+{% endblock %}
