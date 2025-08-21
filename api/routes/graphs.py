@@ -27,16 +27,31 @@ graphs_router = APIRouter()
 
 
 class GraphData(BaseModel):
+    """Graph data model.
+
+    Args:
+        BaseModel (_type_): _description_
+    """
     database: str
 
 
 class ChatRequest(BaseModel):
+    """Chat request model.
+
+    Args:
+        BaseModel (_type_): _description_
+    """
     chat: list
     result: list = None
     instructions: str = None
 
 
 class ConfirmRequest(BaseModel):
+    """Confirmation request model.
+
+    Args:
+        BaseModel (_type_): _description_
+    """
     sql_query: str
     confirmation: str = ""
     chat: list = []

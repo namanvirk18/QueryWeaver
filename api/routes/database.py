@@ -13,6 +13,11 @@ database_router = APIRouter()
 
 
 class DatabaseConnectionRequest(BaseModel):
+    """Database connection request model.
+
+    Args:
+        BaseModel (_type_): _description_
+    """
     url: str
 
 
