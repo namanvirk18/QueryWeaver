@@ -1,0 +1,13 @@
+{
+  "name": "queryweaver-app",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "esbuild ts/app.ts --bundle --outfile=./public/js/app.js --sourcemap --platform=browser",
+    "watch": "esbuild ts/app.ts --bundle --outfile=./public/js/app.js --sourcemap --platform=browser --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.18.0",
+    "typescript": "^5.0.0"
+  }
+}

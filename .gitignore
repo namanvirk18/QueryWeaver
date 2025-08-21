@@ -15,3 +15,5 @@ tests/e2e/screenshots/*.png
 # Temporary test files
 *.tmp
 tmp_*
+*.d.ts
+node_modules/

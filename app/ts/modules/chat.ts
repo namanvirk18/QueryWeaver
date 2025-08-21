@@ -1,47 +1,42 @@
 /**
- * Chat API and messaging functionality
+ * Chat API and messaging functionality (TypeScript)
  */
 
 import { DOM, state, MESSAGE_DELIMITER } from './config.js';
 import { addMessage, removeLoadingMessage, moveLoadingMessageToBottom } from './messages.js';
 
 export async function sendMessage() {
-    const message = DOM.messageInput.value.trim();
+    const message = (DOM.messageInput?.value || '').trim();
     if (!message) return;
 
-    // Check if a graph is selected
-    const selectedValue = DOM.graphSelect.value;
+    const selectedValue = DOM.graphSelect?.value || '';
     if (!selectedValue) {
-        addMessage("Please select a graph from the dropdown before sending a message.", false, true);
+        addMessage('Please select a graph from the dropdown before sending a message.', false, true);
         return;
     }
 
-    // Cancel any ongoing request
     if (state.currentRequestController) {
         state.currentRequestController.abort();
     }
 
-    // Add user message to chat
-    addMessage(message, true, false, false, false, window.currentUser);
-    DOM.messageInput.value = '';
+    addMessage(message, true, false, false, false, (window as any).currentUser || null);
+    if (DOM.messageInput) DOM.messageInput.value = '';
 
     // Show typing indicator
-    DOM.inputContainer.classList.add('loading');
-    DOM.submitButton.style.display = 'none';
-    DOM.pauseButton.style.display = 'block';
-    DOM.newChatButton.disabled = true;
-    addMessage("", false, false, false, true);
+    DOM.inputContainer?.classList.add('loading');
+    if (DOM.submitButton) DOM.submitButton.style.display = 'none';
+    if (DOM.pauseButton) DOM.pauseButton.style.display = 'block';
+    if (DOM.newChatButton) DOM.newChatButton.disabled = true;
+    addMessage('', false, false, false, true);
 
     [DOM.confValue, DOM.expValue, DOM.missValue, DOM.ambValue].forEach((element) => {
-        element.innerHTML = '';
+        if (element) element.innerHTML = '';
     });
 
     try {
-        // Create an AbortController for this request
         state.currentRequestController = new AbortController();
 
-        // Use fetch with streaming response (POST method)
-        const response = await fetch('/graphs/' + selectedValue + '?q=' + encodeURIComponent(message), {
+        const response = await fetch('/graphs/' + encodeURIComponent(selectedValue) + '?q=' + encodeURIComponent(message), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -49,42 +44,38 @@ export async function sendMessage() {
             body: JSON.stringify({
                 chat: state.questions_history,
                 result: state.result_history,
-                instructions: DOM.expInstructions.value,
+                instructions: DOM.expInstructions?.value
             }),
             signal: state.currentRequestController.signal
         });
 
-        // Check if the response is ok
         if (!response.ok) {
             throw new Error(`Server responded with ${response.status}`);
         }
 
-        // Process the streaming response
         await processStreamingResponse(response);
         state.currentRequestController = null;
-
-    } catch (error) {
+    } catch (error: any) {
         if (error.name === 'AbortError') {
             console.log('Request was aborted');
         } else {
             console.error('Error:', error);
             resetUIState();
-            addMessage('Sorry, there was an error processing your message: ' + error.message, false);
+            addMessage('Sorry, there was an error processing your message: ' + (error.message || String(error)), false);
         }
         state.currentRequestController = null;
     }
 }
 
-async function processStreamingResponse(response) {
+async function processStreamingResponse(response: Response) {
+    if (!response.body) return;
     const reader = response.body.getReader();
-    let decoder = new TextDecoder();
+    const decoder = new TextDecoder();
     let buffer = '';
 
     while (true) {
         const { done, value } = await reader.read();
-
         if (done) {
-            // Process any remaining data in the buffer
             if (buffer.trim()) {
                 try {
                     const step = JSON.parse(buffer);
@@ -96,12 +87,10 @@ async function processStreamingResponse(response) {
             break;
         }
 
-        // Decode the chunk and add it to our buffer
         const chunk = decoder.decode(value, { stream: true });
         buffer += chunk;
 
-        // Process complete message objects from the buffer using custom delimiter
-        let delimiterIndex;
+        let delimiterIndex: number;
         while ((delimiterIndex = buffer.indexOf(MESSAGE_DELIMITER)) !== -1) {
             const message = buffer.slice(0, delimiterIndex).trim();
             buffer = buffer.slice(delimiterIndex + MESSAGE_DELIMITER.length);
@@ -112,13 +101,13 @@ async function processStreamingResponse(response) {
                 const step = JSON.parse(message);
                 handleStreamMessage(step);
             } catch (e) {
-                addMessage("Failed: " + message, false);
+                addMessage('Failed: ' + message, false);
             }
         }
     }
 }
 
-function handleStreamMessage(step) {
+function handleStreamMessage(step: any) {
     if (step.type === 'reasoning_step') {
         addMessage(step.message, false);
         moveLoadingMessageToBottom();
@@ -137,30 +126,31 @@ function handleStreamMessage(step) {
     } else {
         addMessage(step.message || JSON.stringify(step), false);
     }
-    
+
     if (step.type !== 'reasoning_step') {
         resetUIState();
     }
 }
 
-function handleFinalResult(step) {
-    DOM.confValue.textContent = `${step.conf}%`;
+function handleFinalResult(step: any) {
+    if (DOM.confValue) DOM.confValue.textContent = `${step.conf}%`;
 
-    [[step.exp, DOM.expValue], [step.miss, DOM.missValue], [step.amb, DOM.ambValue]].forEach(([value, element]) => {
+    [[step.exp, DOM.expValue], [step.miss, DOM.missValue], [step.amb, DOM.ambValue]].forEach(([value, element]: any) => {
+        if (!element) return;
         element.innerHTML = '';
-        let ul = document.getElementById(`${element.id}-list`);
+        let ul = document.getElementById(`${element.id}-list`) as HTMLUListElement | null;
 
-        ul = document.createElement("ul");
+        ul = document.createElement('ul');
         ul.className = `final-result-list`;
         ul.id = `${element.id}-list`;
         element.appendChild(ul);
 
-        value.split('-').forEach((item, i) => {
+        (value || '').split('-').forEach((item: string, i: number) => {
             if (item === '') return;
 
             let li = document.getElementById(`${element.id}-${i}-li`);
 
-            li = document.createElement("li");
+            li = document.createElement('li');
             li.id = `${element.id}-${i}-li`;
             ul.appendChild(li);
 
@@ -176,27 +166,27 @@ function handleFinalResult(step) {
     }
 }
 
-function handleFollowupQuestions(step) {
-    DOM.expValue.textContent = "N/A";
-    DOM.confValue.textContent = "N/A";
-    DOM.missValue.textContent = "N/A";
-    DOM.ambValue.textContent = "N/A";
+function handleFollowupQuestions(step: any) {
+    if (DOM.expValue) DOM.expValue.textContent = 'N/A';
+    if (DOM.confValue) DOM.confValue.textContent = 'N/A';
+    if (DOM.missValue) DOM.missValue.textContent = 'N/A';
+    if (DOM.ambValue) DOM.ambValue.textContent = 'N/A';
     addMessage(step.message, false, true);
 }
 
-function handleQueryResult(step) {
+function handleQueryResult(step: any) {
     if (step.data) {
         addMessage(`Query Result: ${JSON.stringify(step.data)}`, false, false, true);
     } else {
-        addMessage("No results found for the query.", false);
+        addMessage('No results found for the query.', false);
     }
 }
 
 function resetUIState() {
-    DOM.inputContainer.classList.remove('loading');
-    DOM.submitButton.style.display = 'block';
-    DOM.pauseButton.style.display = 'none';
-    DOM.newChatButton.disabled = false;
+    DOM.inputContainer?.classList.remove('loading');
+    if (DOM.submitButton) DOM.submitButton.style.display = 'block';
+    if (DOM.pauseButton) DOM.pauseButton.style.display = 'none';
+    if (DOM.newChatButton) DOM.newChatButton.disabled = false;
     removeLoadingMessage();
 }
 
@@ -204,84 +194,72 @@ export function pauseRequest() {
     if (state.currentRequestController) {
         state.currentRequestController.abort();
         state.currentRequestController = null;
-        
+
         resetUIState();
-        addMessage("Request was paused by user.", false, true);
+        addMessage('Request was paused by user.', false, true);
     }
 }
 
-/**
- * Escapes a string for safe embedding in a single-quoted JavaScript string literal.
- * Replaces backslashes and single quotes.
- */
-function escapeForSingleQuotedJsString(str) {
+function escapeForSingleQuotedJsString(str: string) {
     return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
-export function addDestructiveConfirmationMessage(step) {
+export function addDestructiveConfirmationMessage(step: any) {
     const messageDiv = document.createElement('div');
     const messageDivContainer = document.createElement('div');
-    
-    messageDivContainer.className = "message-container bot-message-container destructive-confirmation-container";
-    messageDiv.className = "message bot-message destructive-confirmation-message";
-    
-    // Generate a unique ID for this confirmation dialog
+
+    messageDivContainer.className = 'message-container bot-message-container destructive-confirmation-container';
+    messageDiv.className = 'message bot-message destructive-confirmation-message';
+
     const confirmationId = 'confirmation-' + Date.now();
-    
-    // Create the confirmation UI
+
     const confirmationHTML = `
         <div class="destructive-confirmation" data-confirmation-id="${confirmationId}">
-            <div class="confirmation-text">${step.message.replace(/\n/g, '<br>')}</div>
+            <div class="confirmation-text">${(step.message || '').replace(/\n/g, '<br>')}</div>
             <div class="confirmation-buttons">
-                <button class="confirm-btn danger" onclick="handleDestructiveConfirmation('CONFIRM', '${escapeForSingleQuotedJsString(step.sql_query)}', '${confirmationId}')">
+                <button class="confirm-btn danger" onclick="handleDestructiveConfirmation('CONFIRM', '${escapeForSingleQuotedJsString(step.sql_query || '')}', '${confirmationId}')">
                     CONFIRM - Execute Query
                 </button>
-                <button class="cancel-btn" onclick="handleDestructiveConfirmation('CANCEL', '${escapeForSingleQuotedJsString(step.sql_query)}', '${confirmationId}')">
+                <button class="cancel-btn" onclick="handleDestructiveConfirmation('CANCEL', '${escapeForSingleQuotedJsString(step.sql_query || '')}', '${confirmationId}')">
                     CANCEL - Abort Operation
                 </button>
             </div>
         </div>
     `;
-    
+
     messageDiv.innerHTML = confirmationHTML;
-    
+
     messageDivContainer.appendChild(messageDiv);
-    DOM.chatMessages.appendChild(messageDivContainer);
-    DOM.chatMessages.scrollTop = DOM.chatMessages.scrollHeight;
-    
-    // Disable the main input while waiting for confirmation
-    DOM.messageInput.disabled = true;
-    DOM.submitButton.disabled = true;
+    if (DOM.chatMessages) DOM.chatMessages.appendChild(messageDivContainer);
+    if (DOM.chatMessages) DOM.chatMessages.scrollTop = DOM.chatMessages.scrollHeight;
+
+    if (DOM.messageInput) DOM.messageInput.disabled = true;
+    if (DOM.submitButton) DOM.submitButton.disabled = true;
 }
 
-export async function handleDestructiveConfirmation(confirmation, sqlQuery, confirmationId) {
-    // Find the specific confirmation dialog using the unique ID
+export async function handleDestructiveConfirmation(confirmation: string, sqlQuery: string, confirmationId: string) {
     const confirmationDialog = document.querySelector(`[data-confirmation-id="${confirmationId}"]`);
     if (confirmationDialog) {
-        // Disable both confirmation buttons within this specific dialog
-        const confirmBtn = confirmationDialog.querySelector('.confirm-btn');
-        const cancelBtn = confirmationDialog.querySelector('.cancel-btn');
+        const confirmBtn = confirmationDialog.querySelector('.confirm-btn') as HTMLButtonElement | null;
+        const cancelBtn = confirmationDialog.querySelector('.cancel-btn') as HTMLButtonElement | null;
         if (confirmBtn) confirmBtn.disabled = true;
         if (cancelBtn) cancelBtn.disabled = true;
     }
-    
-    // Re-enable the input
-    DOM.messageInput.disabled = false;
-    DOM.submitButton.disabled = false;
-    
-    // Add user's choice as a message
-    addMessage(`User choice: ${confirmation}`, true, false, false, false, window.currentUser);
-    
+
+    if (DOM.messageInput) DOM.messageInput.disabled = false;
+    if (DOM.submitButton) DOM.submitButton.disabled = false;
+
+    addMessage(`User choice: ${confirmation}`, true, false, false, false, (window as any).currentUser || null);
+
     if (confirmation === 'CANCEL') {
-        addMessage("Operation cancelled. The destructive SQL query was not executed.", false, true);
+        addMessage('Operation cancelled. The destructive SQL query was not executed.', false, true);
         return;
     }
-    
-    // If confirmed, send confirmation to server
+
     try {
-        const selectedValue = DOM.graphSelect.value;
-        
-        const response = await fetch('/graphs/' + selectedValue + '/confirm', {
+        const selectedValue = DOM.graphSelect?.value || '';
+
+        const response = await fetch('/graphs/' + encodeURIComponent(selectedValue) + '/confirm', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -292,19 +270,15 @@ export async function handleDestructiveConfirmation(confirmation, sqlQuery, conf
                 chat: state.questions_history
             })
         });
-        
-        if (!response.ok) {
-            throw new Error(`Server responded with ${response.status}`);
-        }
-        
-        // Process the streaming response
+
+        if (!response.ok) throw new Error(`Server responded with ${response.status}`);
+
         await processStreamingResponse(response);
-        
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error:', error);
-        addMessage('Sorry, there was an error processing the confirmation: ' + error.message, false);
+        addMessage('Sorry, there was an error processing the confirmation: ' + (error.message || String(error)), false);
     }
 }
 
-// Make functions globally available for onclick handlers
-window.handleDestructiveConfirmation = handleDestructiveConfirmation;
+// Expose global for inline onclick handlers
+(window as any).handleDestructiveConfirmation = handleDestructiveConfirmation;

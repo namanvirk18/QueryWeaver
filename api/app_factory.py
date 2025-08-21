@@ -24,7 +24,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def create_app():
     """Create and configure the Flask application."""
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder="../app/templates", static_folder="../app/public")
     app.secret_key = os.getenv("FLASK_SECRET_KEY")
     if not app.secret_key:
         app.secret_key = secrets.token_hex(32)

@@ -8,7 +8,7 @@
 
 @font-face {
   font-family: 'Fira Code';
-  src: url('../public/fonts/fira_code.ttf');
+  src: url('fonts/fira_code.ttf');
 }
 
 body {
