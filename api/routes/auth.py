@@ -22,6 +22,17 @@ def home():
     if not is_authenticated and not google.authorized and not github.authorized:
         session.pop("user_info", None)
 
+    # If unauthenticated, show a simple landing page that invites sign-in or continuing as guest
+    if not is_authenticated:
+        return render_template("landing.j2", is_authenticated=False, user_info=None)
+
+    return render_template("chat.j2", is_authenticated=is_authenticated, user_info=user_info)
+
+
+@auth_bp.route('/chat')
+def chat():
+    """Explicit chat route (renders main chat UI)."""
+    user_info, is_authenticated = validate_and_cache_user()
     return render_template("chat.j2", is_authenticated=is_authenticated, user_info=user_info)
 
 

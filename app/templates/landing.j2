@@ -1,0 +1,119 @@
+{% extends "base.j2" %}
+
+{% block title %}QueryWeaver — Natural language to SQL{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="landing-container">
+
+  <!-- Left hero -->
+  <section class="hero-left">
+    <h1 class="hero-title">Transform Plain<br/>English into Powerful<br/>SQL.</h1>
+    <p class="hero-sub">The intelligent AI solution that connects your business questions to data across multiple databases. Ask a question in plain English and get runnable SQL and visual results.</p>
+
+    <div class="hero-ctas">
+      <a href="{{ url_for('auth.chat') }}" class="btn-pill">Sign Up for Free</a>
+      <a href="{{ url_for('auth.login_google') }}" class="btn-ghost">Sign In</a>
+    </div>
+  </section>
+
+  <!-- Right demo card -->
+  <aside class="demo-card">
+    <div class="demo-inner">
+      <div class="demo-label">Your Business Question:</div>
+      <div class="demo-question">Which customers from Germany who bought 'Chai' also have an open support ticket in Salesforce?</div>
+
+      <div class="demo-label">Generated SQL:</div>
+      <pre class="demo-sql">
+SELECT c.companyName
+FROM customers c
+JOIN orders o ON c.customerID = o.customerID
+JOIN order_details od ON o.orderID = od.orderID
+JOIN products p ON od.productID = p.productID
+JOIN salesforce_tickets st ON c.customerID = st.customerID
+WHERE c.country = 'Germany'
+  AND p.productName = 'Chai'
+  AND st.status = 'Open';
+      </pre>
+
+      <div class="demo-cta">
+        <button id="demo-next" class="btn-full" type="button">Try another question</button>
+      </div>
+    </div>
+    <script>
+      (function(){
+        const examples = [
+          {
+            q: "Which customers from Germany who bought 'Chai' also have an open support ticket in Salesforce?",
+            sql: `SELECT c.companyName\nFROM customers c\nJOIN orders o ON c.customerID = o.customerID\nJOIN order_details od ON o.orderID = od.orderID\nJOIN products p ON od.productID = p.productID\nJOIN salesforce_tickets st ON c.customerID = st.customerID\nWHERE c.country = 'Germany'\n  AND p.productName = 'Chai'\n  AND st.status = 'Open';`
+          },
+          {
+            q: "Show me the top 5 customers by order count in London.",
+            sql: `SELECT c.companyName, COUNT(o.orderID) AS order_count\nFROM customers c\nJOIN orders o ON c.customerID = o.customerID\nWHERE c.city = 'London'\nGROUP BY c.companyName\nORDER BY order_count DESC\nLIMIT 5;`
+          },
+          {
+            q: "What is the quarterly revenue trend for the 'Beverages' category over the last two years?",
+            sql: `SELECT strftime('%Y-Q%q', o.orderDate) AS quarter,\n  SUM(od.unitPrice * od.quantity) AS total_revenue\nFROM orders o\nJOIN order_details od ON o.orderID = od.orderID\nJOIN products p ON od.productID = p.productID\nJOIN categories cat ON p.categoryID = cat.categoryID\nWHERE cat.categoryName = 'Beverages'\n  AND o.orderDate >= date('now', '-2 years')\nGROUP BY quarter\nORDER BY quarter;`
+          }
+        ];
+
+        let idx = 0;
+        const qEl = document.querySelector('.demo-question');
+        const sEl = document.querySelector('.demo-sql');
+        const btn = document.getElementById('demo-next');
+
+        let typingTimer = null;
+        const typingSpeed = 15; // ms per character
+
+        function renderFull(i){
+          const ex = examples[i % examples.length];
+          if(qEl) qEl.textContent = ex.q;
+          if(sEl) {
+            sEl.classList.remove('typing');
+            sEl.textContent = ex.sql;
+          }
+        }
+
+        function typeSql(text){
+          if(!sEl) return;
+          // stop any previous typing
+          if(typingTimer) {
+            clearInterval(typingTimer);
+            typingTimer = null;
+          }
+          sEl.classList.add('typing');
+          sEl.textContent = '';
+          let pos = 0;
+          typingTimer = setInterval(() => {
+            pos += 1;
+            sEl.textContent = text.slice(0, pos);
+            if(pos >= text.length){
+              clearInterval(typingTimer);
+              typingTimer = null;
+              sEl.classList.remove('typing');
+            }
+          }, typingSpeed);
+        }
+
+        if(btn){
+          btn.addEventListener('click', function(){
+            idx = (idx + 1) % examples.length;
+            const ex = examples[idx];
+            if(qEl) qEl.textContent = ex.q;
+            // animate SQL typing
+            typeSql(ex.sql);
+          });
+        }
+
+        // initial render: show full first example without typing
+        renderFull(0);
+      })();
+    </script>
+    </div>
+  </aside>
+
+</div>
+{% endblock %}
