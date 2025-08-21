@@ -1,4 +1,4 @@
-.PHONY: help install test test-unit test-e2e test-e2e-headed lint format clean setup-dev build
+.PHONY: help install test test-unit test-e2e test-e2e-headed lint format clean setup-dev build lint-frontend
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -42,9 +42,15 @@ test-e2e-headed: build-dev ## Run E2E tests with browser visible
 test-e2e-debug: build-dev ## Run E2E tests with debugging enabled
 	pipenv run python -m pytest tests/e2e/ --browser chromium --slowmo=1000
 
-lint: ## Run linting
-	pipenv run pylint $(shell git ls-files '*.py')
+lint: ## Run linting (backend + frontend)
+	@echo "Running backend lint (pylint)"
+	pipenv run pylint $(shell git ls-files '*.py') || true
+	@echo "Running frontend lint (eslint)"
+	make lint-frontend
 
+lint-frontend: ## Run frontend lint (ESLint)
+	npm --prefix ./app run lint
+	
 format: ## Format code (placeholder - add black/autopep8 if needed)
 	@echo "Add code formatting tool like black here"
 

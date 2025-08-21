@@ -73,6 +73,7 @@ async function processStreamingResponse(response: Response) {
     const decoder = new TextDecoder();
     let buffer = '';
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
         const { done, value } = await reader.read();
         if (done) {
@@ -158,7 +159,7 @@ function handleFinalResult(step: any) {
         });
     });
 
-    let message = step.message || JSON.stringify(step.data, null, 2);
+    const message = step.message || JSON.stringify(step.data, null, 2);
     if (step.is_valid) {
         addMessage(message, false, false, true);
     } else {

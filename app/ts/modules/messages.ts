@@ -90,12 +90,12 @@ export function moveLoadingMessageToBottom() {
 }
 
 export function formatBlock(text: string) {
-    text = text.replace(/^\"(.*)\"$/, '$1').trim();
+    text = text.replace(/^"(.*)"$/, '$1').trim();
 
     // SQL block
     if (text.startsWith('```sql') && text.endsWith('```')) {
         const sql = text.slice(6, -3).trim();
-        return sql.split('\n').map((line, i) => {
+        return sql.split('\n').map((line) => {
             const lineDiv = document.createElement('div');
             lineDiv.className = 'sql-line';
             lineDiv.textContent = line;
@@ -106,7 +106,7 @@ export function formatBlock(text: string) {
     // Array block
     if (text.includes('[') && text.includes(']')) {
         const parts = text.split('[');
-        const formattedParts = parts.map((part, i) => {
+        const formattedParts = parts.map((part) => {
             const lineDiv = document.createElement('div');
             lineDiv.className = 'array-line';
             part = part.replaceAll(']', '');
@@ -119,7 +119,7 @@ export function formatBlock(text: string) {
     // Generic multi-line block
     text = text.replace(/\\n/g, '\n');
     if (text.includes('\n')) {
-        return text.split('\n').map((line, i) => {
+        return text.split('\n').map((line) => {
             const lineDiv = document.createElement('div');
             lineDiv.className = 'plain-line';
             lineDiv.textContent = line;

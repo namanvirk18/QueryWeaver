@@ -102,7 +102,6 @@ export function setupDatabaseModal() {
             return;
         }
 
-        const config = databaseConfig[selectedType];
         if (selectedType === 'postgresql' && !dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
             alert('PostgreSQL URL must start with postgresql:// or postgres://');
             return;

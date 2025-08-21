@@ -5,11 +5,10 @@
 export function showGraph(data: any) {
 
     // ForceGraph might be a global factory function provided by a bundled lib
-    // @ts-ignore
     const Graph = (ForceGraph as any)()(document.getElementById('schema-graph'))
         .graphData(data)
         .nodeId('name')
-        .nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+        .nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D) => {
             const nodeWidth = 160;
             const lineHeight = 14;
             const padding = 8;
@@ -128,7 +127,7 @@ export function showGraph(data: any) {
                     const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
                     return L > 0.6 ? '#111' : '#ffffff';
                 }
-            } catch (e) {}
+            } catch (e) { /* empty */ }
             return '#ffffff';
         };
         const edgeColor = (() => {
