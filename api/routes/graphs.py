@@ -2,10 +2,14 @@
 
 import json
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
+from typing import Dict, Any
 
-from flask import Blueprint, jsonify, request, Response, stream_with_context, g
+from fastapi import APIRouter, Request, HTTPException, status, UploadFile, File, Form
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel
 
 from api.agents import AnalysisAgent, RelevancyAgent, ResponseFormatterAgent
 from api.auth.user_management import token_required
@@ -20,7 +24,24 @@ from api.loaders.odata_loader import ODataLoader
 # Use the same delimiter as in the JavaScript
 MESSAGE_DELIMITER = "|||FALKORDB_MESSAGE_BOUNDARY|||"
 
-graphs_bp = Blueprint("graphs", __name__, url_prefix="/graphs")
+graphs_router = APIRouter()
+
+
+class GraphData(BaseModel):
+    database: str
+
+
+class ChatRequest(BaseModel):
+    chat: list
+    result: list = None
+    instructions: str = None
+
+
+class ConfirmRequest(BaseModel):
+    sql_query: str
+    confirmation: str = ""
+    chat: list = []
+
 
 def get_database_type_and_loader(db_url: str):
     """
@@ -55,23 +76,23 @@ def sanitize_log_input(value: str) -> str:
         return str(value)
     return value.replace('\n', ' ').replace('\r', ' ')
 
-@graphs_bp.route("")
+@graphs_router.get("")
 @token_required
-def list_graphs():
+async def list_graphs(request: Request):
     """
     This route is used to list all the graphs that are available in the database.
     """
-    user_id = g.user_id
+    user_id = request.state.user_id
     user_graphs = db.list_graphs()
     # Only include graphs that start with user_id + '_', and strip the prefix
     filtered_graphs = [graph[len(f"{user_id}_"):]
                        for graph in user_graphs if graph.startswith(f"{user_id}_")]
-    return jsonify(filtered_graphs)
+    return JSONResponse(content=filtered_graphs)
 
 
-@graphs_bp.route("/<string:graph_id>/data", methods=["GET"])
+@graphs_router.get("/{graph_id}/data")
 @token_required
-def get_graph_data(graph_id: str):
+async def get_graph_data(request: Request, graph_id: str):
     """Return all nodes and edges for the specified graph (namespaced to the user).
 
     This endpoint returns a JSON object with two keys: `nodes` and `edges`.
@@ -79,16 +100,16 @@ def get_graph_data(graph_id: str):
     Edges contain source and target node names (or internal ids), type and props.
     """
     if not graph_id or not isinstance(graph_id, str):
-        return jsonify({"error": "Invalid graph_id"}), 400
+        return JSONResponse(content={"error": "Invalid graph_id"}, status_code=400)
 
     graph_id = graph_id.strip()[:200]
-    namespaced = g.user_id + "_" + graph_id
+    namespaced = request.state.user_id + "_" + graph_id
 
     try:
         graph = db.select_graph(namespaced)
     except Exception as e:
         logging.error("Failed to select graph %s: %s", sanitize_log_input(namespaced), e)
-        return jsonify({"error": "Graph not found or database error"}), 404
+        return JSONResponse(content={"error": "Graph not found or database error"}, status_code=404)
 
     # Build table nodes with columns and table-to-table links (foreign keys)
     tables_query = """
@@ -109,7 +130,7 @@ def get_graph_data(graph_id: str):
         links_res = graph.query(links_query).result_set
     except Exception as e:
         logging.error("Error querying graph data for %s: %s", sanitize_log_input(namespaced), e)
-        return jsonify({"error": "Failed to read graph data"}), 500
+        return JSONResponse(content={"error": "Failed to read graph data"}, status_code=500)
 
     nodes = []
     for row in tables_res:
@@ -165,12 +186,12 @@ def get_graph_data(graph_id: str):
         seen.add(key)
         links.append({"source": source, "target": target})
 
-    return jsonify({"nodes": nodes, "links": links})
+    return JSONResponse(content={"nodes": nodes, "links": links})
 
 
-@graphs_bp.route("", methods=["POST"])
+@graphs_router.post("")
 @token_required
-def load_graph():
+async def load_graph(request: Request, data: GraphData = None, file: UploadFile = File(None)):
     """
     This route is used to load the graph data into the database.
     It expects either:
@@ -178,112 +199,91 @@ def load_graph():
     - A File upload (multipart/form-data)
     - An XML payload (application/xml or text/xml)
     """
-    content_type = request.content_type
     success, result = False, "Invalid content type"
     graph_id = ""
 
     # ✅ Handle JSON Payload
-    if content_type.startswith("application/json"):
-        data = request.get_json()
-        if not data or "database" not in data:
-            return jsonify({"error": "Invalid JSON data"}), 400
+    if data:
+        if not hasattr(data, 'database') or not data.database:
+            raise HTTPException(status_code=400, detail="Invalid JSON data")
 
-        graph_id = g.user_id + "_" + data["database"]
-        success, result = JSONLoader.load(graph_id, data)
+        graph_id = request.state.user_id + "_" + data.database
+        success, result = JSONLoader.load(graph_id, data.dict())
 
-    # # ✅ Handle XML Payload
-    # elif content_type.startswith("application/xml") or content_type.startswith("text/xml"):
-    #     xml_data = request.data
-    #     graph_id = ""
-    #     success, result = ODataLoader.load(graph_id, xml_data)
-
-    # # ✅ Handle CSV Payload
-    # elif content_type.startswith("text/csv"):
-    #     csv_data = request.data
-    #     graph_id = ""
-    #     success, result = CSVLoader.load(graph_id, csv_data)
-
-    # ✅ Handle File Upload (FormData with JSON/XML)
-    elif content_type.startswith("multipart/form-data"):
-        if "file" not in request.files:
-            return jsonify({"error": "No file uploaded"}), 400
-
-        file = request.files["file"]
-        if file.filename == "":
-            return jsonify({"error": "Empty file"}), 400
+    # ✅ Handle File Upload
+    elif file:
+        content = await file.read()
+        filename = file.filename
 
         # ✅ Check if file is JSON
-        if file.filename.endswith(".json"):
+        if filename.endswith(".json"):
             try:
-                data = json.load(file)
-                graph_id = g.user_id + "_" + data.get("database", "")
+                data = json.loads(content.decode("utf-8"))
+                graph_id = request.state.user_id + "_" + data.get("database", "")
                 success, result = JSONLoader.load(graph_id, data)
             except json.JSONDecodeError:
-                return jsonify({"error": "Invalid JSON file"}), 400
+                raise HTTPException(status_code=400, detail="Invalid JSON file")
 
         # ✅ Check if file is XML
-        elif file.filename.endswith(".xml"):
-            xml_data = file.read().decode("utf-8")  # Convert bytes to string
-            graph_id = g.user_id + "_" + file.filename.replace(".xml", "")
+        elif filename.endswith(".xml"):
+            xml_data = content.decode("utf-8")
+            graph_id = request.state.user_id + "_" + filename.replace(".xml", "")
             success, result = ODataLoader.load(graph_id, xml_data)
 
         # ✅ Check if file is csv
-        elif file.filename.endswith(".csv"):
-            csv_data = file.read().decode("utf-8")  # Convert bytes to string
-            graph_id = g.user_id + "_" + file.filename.replace(".csv", "")
+        elif filename.endswith(".csv"):
+            csv_data = content.decode("utf-8")
+            graph_id = request.state.user_id + "_" + filename.replace(".csv", "")
             success, result = CSVLoader.load(graph_id, csv_data)
 
         else:
-            return jsonify({"error": "Unsupported file type"}), 415
+            raise HTTPException(status_code=415, detail="Unsupported file type")
     else:
-        return jsonify({"error": "Unsupported Content-Type"}), 415
+        raise HTTPException(status_code=415, detail="Unsupported Content-Type")
 
     # ✅ Return the final response
     if success:
-        return jsonify({"message": "Graph loaded successfully", "graph_id": graph_id})
+        return JSONResponse(content={"message": "Graph loaded successfully", "graph_id": graph_id})
 
     # Log detailed error but return generic message to user
     logging.error("Graph loading failed: %s", str(result)[:100])
-    return jsonify({"error": "Failed to load graph data"}), 400
+    raise HTTPException(status_code=400, detail="Failed to load graph data")
 
 
-@graphs_bp.route("/<string:graph_id>", methods=["POST"])
+@graphs_router.post("/{graph_id}")
 @token_required
-def query_graph(graph_id: str):
+async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
     """
     text2sql
     """
     # Input validation
     if not graph_id or not isinstance(graph_id, str):
-        return jsonify({"error": "Invalid graph_id"}), 400
+        raise HTTPException(status_code=400, detail="Invalid graph_id")
 
     # Sanitize graph_id to prevent injection
     graph_id = graph_id.strip()[:100]  # Limit length and strip whitespace
     if not graph_id:
-        return jsonify({"error": "Invalid graph_id"}), 400
+        raise HTTPException(status_code=400, detail="Invalid graph_id")
 
-    graph_id = g.user_id + "_" + graph_id
-    request_data = request.get_json()
+    graph_id = request.state.user_id + "_" + graph_id
 
-    if not request_data:
-        return jsonify({"error": "No JSON data provided"}), 400
-
-    queries_history = request_data.get("chat")
-    result_history = request_data.get("result")
-    instructions = request_data.get("instructions")
+    queries_history = chat_data.chat if hasattr(chat_data, 'chat') else None
+    result_history = chat_data.result if hasattr(chat_data, 'result') else None
+    instructions = chat_data.instructions if hasattr(chat_data, 'instructions') else None
 
     if not queries_history or not isinstance(queries_history, list):
-        return jsonify({"error": "Invalid or missing chat history"}), 400
+        raise HTTPException(status_code=400, detail="Invalid or missing chat history")
 
     if len(queries_history) == 0:
-        return jsonify({"error": "Empty chat history"}), 400
+        raise HTTPException(status_code=400, detail="Empty chat history")
 
     logging.info("User Query: %s", sanitize_query(queries_history[-1]))
 
     # Create a generator function for streaming
-    def generate():
+    async def generate():
         agent_rel = RelevancyAgent(queries_history, result_history)
         agent_an = AnalysisAgent(queries_history, result_history)
+        step1_start = time.perf_counter()
 
         step = {"type": "reasoning_step",
                 "message": "Step 1: Analyzing user query and generating SQL..."}
@@ -303,8 +303,10 @@ def query_graph(graph_id: str):
 
         logging.info("Calling to relevancy agent with query: %s",
                      sanitize_query(queries_history[-1]))
-
+        rel_start = time.perf_counter()
         answer_rel = agent_rel.get_answer(queries_history[-1], db_description)
+        rel_elapsed = time.perf_counter() - rel_start
+        logging.info("Relevancy check took %.2f seconds", rel_elapsed)
         if answer_rel["status"] != "On-topic":
             step = {
                 "type": "followup_questions",
@@ -312,12 +314,21 @@ def query_graph(graph_id: str):
             }
             logging.info("SQL Fail reason: %s", answer_rel["reason"])
             yield json.dumps(step) + MESSAGE_DELIMITER
+            # Total time for the pre-analysis phase
+            step1_elapsed = time.perf_counter() - step1_start
+            logging.info("Step 1 (relevancy + prep) took %.2f seconds", step1_elapsed)
         else:
             # Use a thread pool to enforce timeout
             with ThreadPoolExecutor(max_workers=1) as executor:
+                find_start = time.perf_counter()
                 future = executor.submit(find, graph_id, queries_history, db_description)
                 try:
                     _, result, _ = future.result(timeout=120)
+                    find_elapsed = time.perf_counter() - find_start
+                    logging.info("Finding relevant tables took %.2f seconds", find_elapsed)
+                    # Total time for the pre-analysis phase
+                    step1_elapsed = time.perf_counter() - step1_start
+                    logging.info("Step 1 (relevancy + table finding) took %.2f seconds", step1_elapsed)
                 except FuturesTimeoutError:
                     yield json.dumps(
                         {
@@ -337,9 +348,12 @@ def query_graph(graph_id: str):
             logging.info("Calling to analysis agent with query: %s",
                          sanitize_query(queries_history[-1]))
 
+            analysis_start = time.perf_counter()
             answer_an = agent_an.get_analysis(
                 queries_history[-1], result, db_description, instructions
             )
+            analysis_elapsed = time.perf_counter() - analysis_start
+            logging.info("SQL generation took %.2f seconds", analysis_elapsed)
 
             logging.info("SQL Result: %s", answer_an['sql_query'])
             yield json.dumps(
@@ -487,23 +501,23 @@ What this will do:
                         {"type": "error", "message": "Error executing SQL query"}
                     ) + MESSAGE_DELIMITER
 
-    return Response(stream_with_context(generate()), content_type="application/json")
+    return StreamingResponse(generate(), media_type="application/json")
 
 
-@graphs_bp.route("/<string:graph_id>/confirm", methods=["POST"])
+@graphs_router.post("/{graph_id}/confirm")
 @token_required
-def confirm_destructive_operation(graph_id: str):
+async def confirm_destructive_operation(request: Request, graph_id: str, confirm_data: ConfirmRequest):
     """
     Handle user confirmation for destructive SQL operations
     """
-    graph_id = g.user_id + "_" + graph_id.strip()
-    request_data = request.get_json()
-    confirmation = request_data.get("confirmation", "").strip().upper()
-    sql_query = request_data.get("sql_query", "")
-    queries_history = request_data.get("chat", [])
+    graph_id = request.state.user_id + "_" + graph_id.strip()
+    
+    confirmation = confirm_data.confirmation.strip().upper() if hasattr(confirm_data, 'confirmation') else ""
+    sql_query = confirm_data.sql_query if hasattr(confirm_data, 'sql_query') else ""
+    queries_history = confirm_data.chat if hasattr(confirm_data, 'chat') else []
 
     if not sql_query:
-        return jsonify({"error": "No SQL query provided"}), 400
+        raise HTTPException(status_code=400, detail="No SQL query provided")
 
     # Create a generator function for streaming the confirmation response
     def generate_confirmation():
@@ -603,56 +617,56 @@ def confirm_destructive_operation(graph_id: str):
                 }
             ) + MESSAGE_DELIMITER
 
-    return Response(stream_with_context(generate_confirmation()), content_type="application/json")
+    return StreamingResponse(generate_confirmation(), media_type="application/json")
 
 
-@graphs_bp.route("/<string:graph_id>/refresh", methods=["POST"])
+@graphs_router.post("/{graph_id}/refresh")
 @token_required
-def refresh_graph_schema(graph_id: str):
+async def refresh_graph_schema(request: Request, graph_id: str):
     """
     Manually refresh the graph schema from the database.
     This endpoint allows users to manually trigger a schema refresh
     if they suspect the graph is out of sync with the database.
     """
-    graph_id = g.user_id + "_" + graph_id.strip()
+    graph_id = request.state.user_id + "_" + graph_id.strip()
 
     try:
         # Get database connection details
         _, db_url = get_db_description(graph_id)
 
         if not db_url or db_url == "No URL available for this database.":
-            return jsonify({
+            return JSONResponse({
                 "success": False,
                 "error": "No database URL found for this graph"
-            }), 400
+            }, status_code=400)
 
         # Determine database type and get appropriate loader
         db_type, loader_class = get_database_type_and_loader(db_url)
 
         if not loader_class:
-            return jsonify({
+            return JSONResponse({
                 "success": False,
                 "error": "Unable to determine database type"
-            }), 400
+            }, status_code=400)
 
         # Perform schema refresh using the appropriate loader
         success, message = loader_class.refresh_graph_schema(graph_id, db_url)
 
         if success:
-            return jsonify({
+            return JSONResponse({
                 "success": True,
                 "message": f"Graph schema refreshed successfully using {db_type}"
-            }), 200
+            })
 
         logging.error("Schema refresh failed for graph %s: %s", graph_id, message)
-        return jsonify({
+        return JSONResponse({
             "success": False,
             "error": "Failed to refresh schema"
-        }), 500
+        }, status_code=500)
 
     except Exception as e:
         logging.error("Error in manual schema refresh: %s", e)
-        return jsonify({
+        return JSONResponse({
             "success": False,
             "error": "Error refreshing schema"
-        }), 500
+        }, status_code=500)

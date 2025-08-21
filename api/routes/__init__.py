@@ -1,7 +1,7 @@
 # Routes module for text2sql API
 
-from .auth import auth_bp
-from .graphs import graphs_bp
-from .database import database_bp
+from .auth import auth_router
+from .graphs import graphs_router
+from .database import database_router
 
-__all__ = ["auth_bp", "graphs_bp", "database_bp"]
+__all__ = ["auth_router", "graphs_router", "database_router"]

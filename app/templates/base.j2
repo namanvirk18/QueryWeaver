@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Chatbot Interface{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="shortcut icon" href="/static/favicon.ico">
     {% block extra_css %}{% endblock %}
     {% if google_tag_manager_id %}
     <!-- Google Tag Manager -->
@@ -34,7 +34,7 @@
     
 <footer id="powered-by-falkordb">
   Powered by <a href="https://falkordb.com" target="_blank" rel="noopener">
-    <img src="{{ url_for('static', filename='icons/logo.svg') }}" alt="FalkorDB Logo" style="height:1.5em;vertical-align:middle;" />
+    <img src="{{ url_for('static', path='icons/logo.svg') }}" alt="FalkorDB Logo" style="height:1.5em;vertical-align:middle;" />
   </a>
 </footer>
 {% block scripts %}

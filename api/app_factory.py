@@ -1,102 +1,102 @@
-"""Application factory for the text2sql Flask app."""
+"""Application factory for the text2sql FastAPI app."""
 
 import logging
 import os
 import secrets
 
 from dotenv import load_dotenv
-from flask import Flask, redirect, url_for, request, abort, session
-from werkzeug.exceptions import HTTPException
-from werkzeug.utils import secure_filename
-from flask_dance.contrib.google import make_google_blueprint
-from flask_dance.contrib.github import make_github_blueprint
-from flask_dance.consumer.storage.session import SessionStorage
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.auth.oauth_handlers import setup_oauth_handlers
-from api.routes.auth import auth_bp
-from api.routes.graphs import graphs_bp
-from api.routes.database import database_bp
+from api.routes.auth import auth_router, init_auth
+from api.routes.graphs import graphs_router
+from api.routes.database import database_router
 
 # Load environment variables from .env file
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
+class SecurityMiddleware(BaseHTTPMiddleware):
+    """Middleware for security checks including static file access"""
+
+    STATIC_PREFIX = '/static/'
+
+    async def dispatch(self, request: Request, call_next):
+        # Block directory access in static files
+        if request.url.path.startswith(self.STATIC_PREFIX):
+            # Remove /static/ prefix to get the actual path
+            filename = request.url.path[len(self.STATIC_PREFIX):]
+            # Basic security check for directory traversal
+            if '../' in filename or filename.endswith('/'):
+                raise HTTPException(status_code=400, detail="Bad request")
+        
+        response = await call_next(request)
+        return response
+
+
 def create_app():
-    """Create and configure the Flask application."""
-    app = Flask(__name__, template_folder="../app/templates", static_folder="../app/public")
-    app.secret_key = os.getenv("FLASK_SECRET_KEY")
-    if not app.secret_key:
-        app.secret_key = secrets.token_hex(32)
+    """Create and configure the FastAPI application."""
+    app = FastAPI(title="QueryWeaver", description="Text2SQL with Graph-Powered Schema Understanding")
+
+    # Get secret key for sessions
+    secret_key = os.getenv("FLASK_SECRET_KEY")
+    if not secret_key:
+        secret_key = secrets.token_hex(32)
         logging.warning("FLASK_SECRET_KEY not set, using generated key. Set this in production!")
 
-    # Google OAuth setup
-    google_client_id = os.getenv("GOOGLE_CLIENT_ID")
-    google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-    google_bp = make_google_blueprint(
-        client_id=google_client_id,
-        client_secret=google_client_secret,
-        scope=[
-            "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            "openid"
-        ]
+    # Add session middleware with explicit settings to ensure OAuth state persists
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=secret_key,
+        session_cookie="qw_session",
+        same_site="lax",  # allow top-level OAuth GET redirects to send cookies
+        https_only=False,  # allow http on localhost in development
+        max_age=60 * 60 * 24 * 14,  # 14 days - measured by seconds
     )
-    app.register_blueprint(google_bp, url_prefix="/login")
+    
+    # Add security middleware
+    app.add_middleware(SecurityMiddleware)
 
-    # GitHub OAuth setup
-    github_client_id = os.getenv("GITHUB_CLIENT_ID")
-    github_client_secret = os.getenv("GITHUB_CLIENT_SECRET")
-    github_bp = make_github_blueprint(
-        client_id=github_client_id,
-        client_secret=github_client_secret,
-        scope="user:email",
-        storage=SessionStorage()
-    )
-    app.register_blueprint(github_bp, url_prefix="/login")
+    # Mount static files
+    static_path = os.path.join(os.path.dirname(__file__), "../app/public")
+    if os.path.exists(static_path):
+        app.mount("/static", StaticFiles(directory=static_path), name="static")
 
-    # Set up OAuth signal handlers
-    setup_oauth_handlers(google_bp, github_bp)
+    # Initialize authentication (OAuth and sessions)
+    init_auth(app)
 
-    # Register blueprints
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(graphs_bp)
-    app.register_blueprint(database_bp)
+    # Include routers
+    app.include_router(auth_router)
+    app.include_router(graphs_router, prefix="/graphs")
+    app.include_router(database_router)
 
-    @app.errorhandler(Exception)
-    def handle_oauth_error(error):
+    @app.exception_handler(Exception)
+    async def handle_oauth_error(request: Request, exc: Exception):
         """Handle OAuth-related errors gracefully"""
         # Check if it's an OAuth-related error
-        if "token" in str(error).lower() or "oauth" in str(error).lower():
-            logging.warning("OAuth error occurred: %s", error)
-            session.clear()
-            return redirect(url_for("auth.home"))
+        if "token" in str(exc).lower() or "oauth" in str(exc).lower():
+            logging.warning("OAuth error occurred: %s", exc)
+            request.session.clear()
+            return RedirectResponse(url="/", status_code=302)
 
-        # If it's an HTTPException (like abort(403)), re-raise so Flask handles it properly
-        if isinstance(error, HTTPException):
-            return error
+        # If it's an HTTPException, re-raise so FastAPI handles it properly
+        if isinstance(exc, HTTPException):
+            raise exc
 
         # For other errors, let them bubble up
-        raise error
+        raise exc
 
-    @app.before_request
-    def block_static_directories():
-        if request.path.startswith('/static/'):
-            # Remove /static/ prefix to get the actual path
-            filename = secure_filename(request.path[8:])
-            # Normalize and ensure the path stays within static_folder
-            static_folder = os.path.abspath(app.static_folder)
-            file_path = os.path.normpath(os.path.join(static_folder, filename))
-            if not file_path.startswith(static_folder):
-                abort(400)  # Bad request, attempted traversal
-            if os.path.isdir(file_path):
-                abort(405)
-
-    @app.context_processor
-    def inject_google_tag_manager():
-        """Inject Google Tag Manager ID into template context."""
-        return {
-            'google_tag_manager_id': os.getenv("GOOGLE_TAG_MANAGER_ID")
-        }
+    # Add template globals
+    @app.middleware("http")
+    async def add_template_globals(request: Request, call_next):
+        request.state.google_tag_manager_id = os.getenv("GOOGLE_TAG_MANAGER_ID")
+        response = await call_next(request)
+        return response
 
     return app

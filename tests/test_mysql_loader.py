@@ -101,7 +101,7 @@ class TestMySQLLoader:
         assert MySQLLoader.is_schema_modifying_query("")[0] is False
         assert MySQLLoader.is_schema_modifying_query(None)[0] is False
 
-    @patch('mysql.connector.connect')
+    @patch('pymysql.connect')
     def test_connection_error(self, mock_connect):
         """Test handling of MySQL connection errors."""
         # Mock connection failure
@@ -112,7 +112,7 @@ class TestMySQLLoader:
         assert success is False
         assert "Error loading MySQL schema" in message
 
-    @patch('mysql.connector.connect')
+    @patch('pymysql.connect')
     @patch('api.loaders.mysql_loader.load_to_graph')
     def test_successful_load(self, mock_load_to_graph, mock_connect):
         """Test successful MySQL schema loading."""

@@ -3,11 +3,12 @@
 import logging
 import time
 from functools import wraps
+from typing import Tuple, Optional, Dict, Any
 
 import requests
-from flask import g, session, jsonify
-from flask_dance.contrib.google import google
-from flask_dance.contrib.github import github
+from fastapi import Request, HTTPException, status
+from fastapi.responses import JSONResponse
+from authlib.integrations.starlette_client import OAuth
 
 from api.extensions import db
 
@@ -158,128 +159,164 @@ def update_identity_last_login(provider, provider_user_id):
                      provider, provider_user_id, e)
 
 
-def validate_and_cache_user():
+async def validate_and_cache_user(request: Request) -> Tuple[Optional[Dict[str, Any]], bool]:
     """
     Helper function to validate OAuth token and cache user info.
-    Returns (user_info, is_authenticated) tuple.
+    Returns (user_info, is_authenticated).
     Supports both Google and GitHub OAuth.
+    Includes refresh handling for Google.
     """
     try:
-        # Check for cached user info from either provider
-        user_info = session.get("user_info")
-        token_validated_at = session.get("token_validated_at", 0)
+        user_info = request.session.get("user_info")
+        token_validated_at = request.session.get("token_validated_at", 0)
         current_time = time.time()
 
         # Use cached user info if it's less than 15 minutes old
-        if user_info and (current_time - token_validated_at) < 900:  # 15 minutes
+        if user_info and (current_time - token_validated_at) < 900:
             return user_info, True
 
-        # Check Google OAuth first
-        if google.authorized:
+        oauth: OAuth = request.app.state.oauth
+
+        # ---- Google OAuth ----
+        google_token = request.session.get("google_token")
+        if google_token and hasattr(oauth, "google"):
             try:
-                resp = google.get("/oauth2/v2/userinfo")
-                if resp.ok:
-                    google_user = resp.json()
-                    # Validate required fields
-                    if not google_user.get("id") or not google_user.get("email"):
-                        logging.warning("Invalid Google user data received")
-                        session.clear()
+                resp = await oauth.google.get("/oauth2/v2/userinfo", token=google_token)
+
+                if resp.status_code == 401 and "refresh_token" in google_token:
+                    # Token expired, try refreshing
+                    try:
+                        new_token = await oauth.google.refresh_token(
+                            "https://oauth2.googleapis.com/token",
+                            refresh_token=google_token["refresh_token"],
+                        )
+                        request.session["google_token"] = new_token
+                        resp = await oauth.google.get("/oauth2/v2/userinfo", token=new_token)
+                        logging.info("Google access token refreshed successfully")
+                    except Exception as e:
+                        logging.error("Google token refresh failed: %s", e)
+                        request.session.pop("google_token", None)
+                        request.session.pop("user_info", None)
                         return None, False
 
-                    # Normalize user info structure
+                if resp.status_code == 200:
+                    google_user = resp.json()
+                    if not google_user.get("id") or not google_user.get("email"):
+                        logging.warning("Invalid Google user data received")
+                        request.session.pop("google_token", None)
+                        request.session.pop("user_info", None)
+                        return None, False
+
+                    # Normalize
                     user_info = {
-                        "id": str(google_user.get("id")),  # Ensure string type
+                        "id": str(google_user.get("id")),
                         "name": google_user.get("name", ""),
                         "email": google_user.get("email"),
                         "picture": google_user.get("picture", ""),
-                        "provider": "google"
+                        "provider": "google",
                     }
-                    session["user_info"] = user_info
-                    session["token_validated_at"] = current_time
+                    request.session["user_info"] = user_info
+                    request.session["token_validated_at"] = current_time
                     return user_info, True
-            except (requests.RequestException, KeyError, ValueError) as e:
+            except Exception as e:
                 logging.warning("Google OAuth validation error: %s", e)
-                session.clear()
+                request.session.pop("google_token", None)
+                request.session.pop("user_info", None)
 
-        # Check GitHub OAuth
-        if github.authorized:
+        # ---- GitHub OAuth ----
+        github_token = request.session.get("github_token")
+        if github_token and hasattr(oauth, "github"):
             try:
-                # Get user profile
-                resp = github.get("/user")
-                if resp.ok:
+                resp = await oauth.github.get("/user", token=github_token)
+                if resp.status_code == 200:
                     github_user = resp.json()
-
-                    # Validate required fields
                     if not github_user.get("id"):
                         logging.warning("Invalid GitHub user data received")
-                        session.clear()
+                        request.session.pop("github_token", None)
+                        request.session.pop("user_info", None)
                         return None, False
 
-                    # Get user email (GitHub may require separate call for email)
-                    email_resp = github.get("/user/emails")
+                    # Get primary email
+                    email_resp = await oauth.github.get("/user/emails", token=github_token)
                     email = None
-                    if email_resp.ok:
-                        emails = email_resp.json()
-                        # Find primary email
-                        for email_obj in emails:
+                    if email_resp.status_code == 200:
+                        for email_obj in email_resp.json():
                             if email_obj.get("primary", False):
                                 email = email_obj.get("email")
                                 break
-
-                        # If no primary email found, use the first one
-                        if not email and emails:
-                            email = emails[0].get("email")
+                        if not email and email_resp.json():
+                            email = email_resp.json()[0].get("email")
 
                     if not email:
                         logging.warning("No email found for GitHub user")
-                        session.clear()
+                        request.session.pop("github_token", None)
+                        request.session.pop("user_info", None)
                         return None, False
 
-                    # Normalize user info structure
                     user_info = {
-                        "id": str(github_user.get("id")),  # Convert to string for consistency
+                        "id": str(github_user.get("id")),
                         "name": github_user.get("name") or github_user.get("login", ""),
                         "email": email,
                         "picture": github_user.get("avatar_url", ""),
-                        "provider": "github"
+                        "provider": "github",
                     }
-                    session["user_info"] = user_info
-                    session["token_validated_at"] = current_time
+                    request.session["user_info"] = user_info
+                    request.session["token_validated_at"] = current_time
                     return user_info, True
-            except (requests.RequestException, KeyError, ValueError) as e:
+            except Exception as e:
                 logging.warning("GitHub OAuth validation error: %s", e)
-                session.clear()
+                request.session.pop("github_token", None)
+                request.session.pop("user_info", None)
 
-        # If no valid authentication found, clear session
-        session.clear()
+        # No valid auth
+        request.session.pop("user_info", None)
         return None, False
 
     except Exception as e:
         logging.error("Unexpected error in validate_and_cache_user: %s", e)
-        session.clear()
+        request.session.pop("user_info", None)
         return None, False
 
+def token_required(func):
+    """Decorator to protect FastAPI routes with token authentication.
+    Automatically refreshes tokens if expired.
+    """
 
-def token_required(f):
-    """Decorator to protect routes with token authentication"""
-
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
+    @wraps(func)
+    async def wrapper(request: Request, *args, **kwargs):
         try:
-            user_info, is_authenticated = validate_and_cache_user()
+            user_info, is_authenticated = await validate_and_cache_user(request)
 
             if not is_authenticated:
-                return jsonify(message="Unauthorized - Please log in"), 401
+                # Second attempt after clearing session to force re-validation
+                request.session.pop("user_info", None)
+                user_info, is_authenticated = await validate_and_cache_user(request)
 
-            g.user_id = user_info.get("id")
-            if not g.user_id:
-                session.clear()
-                return jsonify(message="Unauthorized - Invalid user"), 401
+            if not is_authenticated:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Unauthorized - Please log in"
+                )
 
-            return f(*args, **kwargs)
+            # Attach user_id to request.state (like Flask's g.user_id)
+            request.state.user_id = user_info.get("id")
+            if not request.state.user_id:
+                request.session.pop("user_info", None)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Unauthorized - Invalid user"
+                )
+
+            return await func(request, *args, **kwargs)
+
+        except HTTPException:
+            raise
         except Exception as e:
             logging.error("Unexpected error in token_required: %s", e)
-            session.clear()
-            return jsonify(message="Unauthorized - Authentication error"), 401
+            request.session.pop("user_info", None)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unauthorized - Authentication error"
+            )
 
-    return decorated_function
+    return wrapper

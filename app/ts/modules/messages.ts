@@ -2,7 +2,7 @@
  * Message handling and UI functions (TypeScript)
  */
 
-import { DOM, state } from './config.js';
+import { DOM, state } from './config';
 
 export function addMessage(
     message: string,

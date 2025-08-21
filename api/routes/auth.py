@@ -1,101 +1,307 @@
 """Authentication routes for the text2sql API."""
 
 import logging
+import os
 import time
+from pathlib import Path
+from urllib.parse import urljoin
 
-import requests
-from flask import Blueprint, render_template, redirect, url_for, session
-from flask_dance.contrib.google import google
-from flask_dance.contrib.github import github
+import httpx
+from fastapi import APIRouter, Request, HTTPException, status
+from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
+from authlib.common.errors import AuthlibBaseError
+from starlette.config import Config
 
 from api.auth.user_management import validate_and_cache_user
 
-auth_bp = Blueprint("auth", __name__)
+# Router
+auth_router = APIRouter()
+TEMPLATES_DIR = str((Path(__file__).resolve().parents[1] / "../app/templates").resolve())
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
+# ---- Helpers ----
+def _get_provider_client(request: Request, provider: str):
+    """Get an OAuth provider client from app.state.oauth"""
+    oauth = getattr(request.app.state, "oauth", None)
+    if not oauth:
+        raise HTTPException(status_code=500, detail="OAuth not configured")
 
-@auth_bp.route("/")
-def home():
-    """Home route"""
-    user_info, is_authenticated = validate_and_cache_user()
+    client = getattr(oauth, provider, None)
+    if not client:
+        raise HTTPException(status_code=500, detail=f"OAuth provider {provider} not configured")
+    return client
 
-    # If not authenticated through OAuth, check for any stale session data
-    if not is_authenticated and not google.authorized and not github.authorized:
-        session.pop("user_info", None)
+def _clear_auth_session(session: dict):
+    """Remove only auth-related keys from session instead of clearing everything."""
+    for key in ["user_info", "google_token", "github_token", "token_validated_at", "oauth_google_auth"]:
+        session.pop(key, None)
 
-    # If unauthenticated, show a simple landing page that invites sign-in or continuing as guest
-    if not is_authenticated:
-        return render_template("landing.j2", is_authenticated=False, user_info=None)
-
-    return render_template("chat.j2", is_authenticated=is_authenticated, user_info=user_info)
-
-
-@auth_bp.route('/chat')
-def chat():
+@auth_router.get("/chat", name="auth.chat", response_class=HTMLResponse)
+async def chat(request: Request) -> HTMLResponse:
     """Explicit chat route (renders main chat UI)."""
-    user_info, is_authenticated = validate_and_cache_user()
-    return render_template("chat.j2", is_authenticated=is_authenticated, user_info=user_info)
+    user_info, is_authenticated = await validate_and_cache_user(request)
+    return templates.TemplateResponse(
+        "chat.j2",
+        {
+            "request": request,
+            "is_authenticated": is_authenticated,
+            "user_info": user_info,
+        },
+    )
 
+def _build_callback_url(request: Request, path: str) -> str:
+    """Build absolute callback URL, honoring OAUTH_BASE_URL if provided."""
+    base_override = os.getenv("OAUTH_BASE_URL")
+    base = base_override if base_override else str(request.base_url)
+    if not base.endswith("/"):
+        base += "/"
+    return urljoin(base, path.lstrip("/"))
 
-@auth_bp.route("/login")
-def login_google():
-    """Handle Google OAuth login route."""
-    if not google.authorized:
-        return redirect(url_for("google.login"))
+# ---- Routes ----
+@auth_router.get("/", response_class=HTMLResponse)
+async def home(request: Request) -> HTMLResponse:
+    user_info, is_authenticated_flag = await validate_and_cache_user(request)
 
-    try:
-        resp = google.get("/oauth2/v2/userinfo")
-        if resp.ok:
-            google_user = resp.json()
+    if not is_authenticated_flag:
+        _clear_auth_session(request.session)
 
-            # Validate required fields
-            if not google_user.get("id") or not google_user.get("email"):
-                logging.error("Invalid Google user data received during login")
-                session.clear()
-                return redirect(url_for("google.login"))
-
-            # Normalize user info structure
-            user_info = {
-                "id": str(google_user.get("id")),  # Ensure string type
-                "name": google_user.get("name", ""),
-                "email": google_user.get("email"),
-                "picture": google_user.get("picture", ""),
-                "provider": "google"
+    if not is_authenticated_flag:
+        return templates.TemplateResponse(
+            "landing.j2", 
+            {
+                "request": request, 
+                "is_authenticated": False, 
+                "user_info": None
             }
-            session["user_info"] = user_info
-            session["token_validated_at"] = time.time()
-            return redirect(url_for("auth.home"))
+        )
 
-        # OAuth token might be expired, redirect to login
-        session.clear()
-        return redirect(url_for("google.login"))
-    except (requests.RequestException, KeyError, ValueError) as e:
-        logging.error("Google login error: %s", e)
-        session.clear()
-        return redirect(url_for("google.login"))
+    return templates.TemplateResponse(
+        "chat.j2",
+        {
+            "request": request,
+            "is_authenticated": is_authenticated_flag,
+            "user_info": user_info,
+        },
+    )
 
 
-@auth_bp.route("/logout")
-def logout():
-    """Handle user logout and token revocation."""
-    session.clear()
+@auth_router.get("/login", response_class=RedirectResponse)
+async def login_page(_: Request) -> RedirectResponse:
+    return RedirectResponse(url="/login/google", status_code=status.HTTP_302_FOUND)
 
-    # Revoke Google OAuth token if authorized
-    if google.authorized:
-        try:
-            google.get(
-                "https://accounts.google.com/o/oauth2/revoke",
-                params={"token": google.access_token}
-            )
-        except (requests.RequestException, AttributeError) as e:
-            logging.warning("Error revoking Google token: %s", e)
 
-    # Revoke GitHub OAuth token if authorized
-    if github.authorized:
-        try:
-            # GitHub doesn't have a simple revoke endpoint like Google
-            # The token will expire naturally or can be revoked from GitHub settings
-            pass
-        except AttributeError as e:
-            logging.warning("Error with GitHub token cleanup: %s", e)
+@auth_router.get("/login/google", name="google.login", response_class=RedirectResponse)
+async def login_google(request: Request) -> RedirectResponse:
+    google = _get_provider_client(request, "google")
+    redirect_uri = _build_callback_url(request, "login/google/authorized")
 
-    return redirect(url_for("auth.home"))
+    # Helpful hint if localhost vs 127.0.0.1 mismatch is likely
+    if not os.getenv("OAUTH_BASE_URL") and "127.0.0.1" in str(request.base_url):
+        logging.warning(
+            "OAUTH_BASE_URL not set and base URL is 127.0.0.1; "
+            "if your Google OAuth app uses 'http://localhost:5000', "
+            "set OAUTH_BASE_URL=http://localhost:5000 to avoid redirect_uri mismatch."
+        )
+
+    return await google.authorize_redirect(request, redirect_uri)
+
+
+@auth_router.get("/login/google/authorized", response_class=RedirectResponse)
+async def google_authorized(request: Request) -> RedirectResponse:
+    try:
+        google = _get_provider_client(request, "google")
+        token = await google.authorize_access_token(request)
+
+        # Always fetch userinfo explicitly
+        resp = await google.get("https://www.googleapis.com/oauth2/v2/userinfo", token=token)
+        if resp.status_code != 200:
+            logging.error("Failed to fetch Google user info: %s", resp.text)
+            _clear_auth_session(request.session)
+            return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+        user_info = resp.json()
+        if not user_info.get("email"):
+            logging.error("Invalid Google user data received")
+            _clear_auth_session(request.session)
+            return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+        # Normalize
+        request.session["user_info"] = {
+            "id": str(user_info.get("id") or user_info.get("sub")),
+            "name": user_info.get("name", ""),
+            "email": user_info.get("email"),
+            "picture": user_info.get("picture", ""),
+            "provider": "google",
+        }
+        request.session["google_token"] = token
+        request.session["token_validated_at"] = time.time()
+
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+    except AuthlibBaseError as e:
+        logging.error("Google OAuth error: %s", e)
+        _clear_auth_session(request.session)
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+
+@auth_router.get("/login/google/callback", response_class=RedirectResponse)
+async def google_callback_compat(request: Request) -> RedirectResponse:
+    qs = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(url=f"/login/google/authorized{qs}", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+
+@auth_router.get("/login/github",  name="github.login", response_class=RedirectResponse)
+async def login_github(request: Request) -> RedirectResponse:
+    github = _get_provider_client(request, "github")
+    redirect_uri = _build_callback_url(request, "login/github/authorized")
+
+    # Helpful hint if localhost vs 127.0.0.1 mismatch is likely
+    if not os.getenv("OAUTH_BASE_URL") and "127.0.0.1" in str(request.base_url):
+        logging.warning(
+            "OAUTH_BASE_URL not set and base URL is 127.0.0.1; "
+            "if your GitHub OAuth app uses 'http://localhost:5000', "
+            "set OAUTH_BASE_URL=http://localhost:5000 to avoid redirect_uri mismatch."
+        )
+
+    return await github.authorize_redirect(request, redirect_uri)
+
+
+@auth_router.get("/login/github/authorized", response_class=RedirectResponse)
+async def github_authorized(request: Request) -> RedirectResponse:
+    try:
+        github = _get_provider_client(request, "github")
+        token = await github.authorize_access_token(request)
+
+        # Fetch GitHub user info
+        resp = await github.get("https://api.github.com/user", token=token)
+        if resp.status_code != 200:
+            logging.error("Failed to fetch GitHub user info: %s", resp.text)
+            _clear_auth_session(request.session)
+            return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+        user_info = resp.json()
+        
+        # Get user email if not public
+        email = user_info.get("email")
+        if not email:
+            # Try to get primary email from emails endpoint
+            email_resp = await github.get("https://api.github.com/user/emails", token=token)
+            if email_resp.status_code == 200:
+                emails = email_resp.json()
+                for email_obj in emails:
+                    if email_obj.get("primary"):
+                        email = email_obj.get("email")
+                        break
+
+        if not user_info.get("id") or not email:
+            logging.error("Invalid GitHub user data received")
+            _clear_auth_session(request.session)
+            return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+        # Normalize user info structure
+        request.session["user_info"] = {
+            "id": str(user_info.get("id")),
+            "name": user_info.get("name") or user_info.get("login", ""),
+            "email": email,
+            "picture": user_info.get("avatar_url", ""),
+            "provider": "github",
+        }
+        request.session["github_token"] = token
+        request.session["token_validated_at"] = time.time()
+
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+    except AuthlibBaseError as e:
+        logging.error("GitHub OAuth error: %s", e)
+        _clear_auth_session(request.session)
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+
+@auth_router.get("/login/github/callback", response_class=RedirectResponse)
+async def github_callback_compat(request: Request) -> RedirectResponse:
+    qs = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(url=f"/login/github/authorized{qs}", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+
+@auth_router.get("/logout", response_class=RedirectResponse)
+async def logout(request: Request) -> RedirectResponse:
+    """Handle user logout and revoke tokens for Google (actively) and GitHub (locally)."""
+    google_token = request.session.get("google_token")
+    github_token = request.session.get("github_token")
+
+    # ---- Revoke Google tokens ----
+    if google_token:
+        tokens_to_revoke = []
+        if access_token := google_token.get("access_token"):
+            tokens_to_revoke.append(access_token)
+        if refresh_token := google_token.get("refresh_token"):
+            tokens_to_revoke.append(refresh_token)
+
+        if tokens_to_revoke:
+            try:
+                async with httpx.AsyncClient() as client:
+                    for token in tokens_to_revoke:
+                        resp = await client.post(
+                            "https://oauth2.googleapis.com/revoke",
+                            params={"token": token},
+                            headers={"content-type": "application/x-www-form-urlencoded"},
+                        )
+                        if resp.status_code != 200:
+                            logging.warning(
+                                "Google token revoke failed (%s): %s",
+                                resp.status_code,
+                                resp.text,
+                            )
+                        else:
+                            logging.info("Successfully revoked Google token")
+            except Exception as e:
+                logging.error("Error revoking Google tokens: %s", e)
+
+    # ---- Handle GitHub tokens ----
+    if github_token:
+        logging.info("GitHub token found, clearing from session (no remote revoke available).")
+        # GitHub logout is local only unless we call the App management API
+
+    # ---- Clear session auth keys ----
+    for key in ["user_info", "google_token", "github_token", "token_validated_at"]:
+        request.session.pop(key, None)
+
+    return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+# ---- Hook for app factory ----
+def init_auth(app):
+    """Initialize OAuth and sessions for the app."""
+    config = Config(".env")
+    from authlib.integrations.starlette_client import OAuth
+    oauth = OAuth(config)
+
+    google_client_id = os.getenv("GOOGLE_CLIENT_ID")
+    google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    if not google_client_id or not google_client_secret:
+        logging.warning("Google OAuth env vars not set; login will fail until configured.")
+
+    oauth.register(
+        name="google",
+        client_id=google_client_id,
+        client_secret=google_client_secret,
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
+
+    github_client_id = os.getenv("GITHUB_CLIENT_ID")
+    github_client_secret = os.getenv("GITHUB_CLIENT_SECRET")
+    if not github_client_id or not github_client_secret:
+        logging.warning("GitHub OAuth env vars not set; login will fail until configured.")
+
+    oauth.register(
+        name="github",
+        client_id=github_client_id,
+        client_secret=github_client_secret,
+        access_token_url="https://github.com/login/oauth/access_token",
+        authorize_url="https://github.com/login/oauth/authorize",
+        api_base_url="https://api.github.com/",
+        client_kwargs={"scope": "user:email"},
+    )
+
+    app.state.oauth = oauth
