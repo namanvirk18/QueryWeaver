@@ -83,7 +83,10 @@ class MySQLLoader(BaseLoader):
         if connection_url.startswith('mysql://'):
             url = connection_url[8:]
         else:
-            raise ValueError("Invalid MySQL URL format. Expected mysql://username:password@host:port/database")
+            raise ValueError(
+                "Invalid MySQL URL format. Expected "
+                "mysql://username:password@host:port/database"
+            )
 
         # Parse components
         if '@' not in url:

@@ -57,7 +57,7 @@ This application supports authentication via Google and GitHub OAuth. You'll nee
 ### Running the Application
 
 ```bash
-pipenv run flask --app api.index run
+pipenv run uvicorn api.index:app --host "localhost" --port "5000"
 ```
 
 The application will be available at `http://localhost:5000`.
@@ -97,7 +97,7 @@ You can configure the application by passing environment variables using the `-e
 
 ```bash
 docker run -p 5000:5000 -it \
-  -e FLASK_SECRET_KEY=your_super_secret_key_here \
+   -e FASTAPI_SECRET_KEY=your_super_secret_key_here \
   -e GOOGLE_CLIENT_ID=your_google_client_id \
   -e GOOGLE_CLIENT_SECRET=your_google_client_secret \
   -e GITHUB_CLIENT_ID=your_github_client_id \

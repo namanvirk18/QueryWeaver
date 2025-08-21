@@ -17,5 +17,14 @@ while ! nc -z "$FALKORDB_HOST" "$FALKORDB_PORT"; do
 done
 
 
-echo "FalkorDB is up - launching Flask..."
-exec python3 -m flask --app api.index run --host=0.0.0.0 --port=5000
+echo "FalkorDB is up - launching FastAPI..."
+# Determine whether to run in reload (debug) mode. The project uses FASTAPI_DEBUG
+# environment variable historically; keep compatibility by honoring it here.
+if [ "${FASTAPI_DEBUG:-False}" = "True" ] || [ "${FASTAPI_DEBUG:-true}" = "true" ]; then
+  RELOAD_FLAG="--reload"
+else
+  RELOAD_FLAG=""
+fi
+
+echo "FalkorDB is up - launching FastAPI (uvicorn)..."
+exec uvicorn api.index:app --host 0.0.0.0 --port 5000 $RELOAD_FLAG

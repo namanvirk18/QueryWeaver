@@ -117,9 +117,9 @@ These test the API directly:
 
 Key environment variables for testing:
 ```bash
-# Required for Flask
-FLASK_SECRET_KEY=your-secret-key
-FLASK_DEBUG=False
+# Required for FastAPI
+FASTAPI_SECRET_KEY=your-secret-key
+FASTAPI_DEBUG=False
 
 # Database connection (optional for basic tests)
 FALKORDB_HOST=localhost

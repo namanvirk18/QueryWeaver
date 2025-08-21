@@ -34,7 +34,13 @@ def _get_provider_client(request: Request, provider: str):
 
 def _clear_auth_session(session: dict):
     """Remove only auth-related keys from session instead of clearing everything."""
-    for key in ["user_info", "google_token", "github_token", "token_validated_at", "oauth_google_auth"]:
+    for key in [
+        "user_info",
+        "google_token",
+        "github_token",
+        "token_validated_at",
+        "oauth_google_auth",
+    ]:
         session.pop(key, None)
 
 @auth_router.get("/chat", name="auth.chat", response_class=HTMLResponse)
@@ -148,7 +154,8 @@ async def google_authorized(request: Request) -> RedirectResponse:
 @auth_router.get("/login/google/callback", response_class=RedirectResponse)
 async def google_callback_compat(request: Request) -> RedirectResponse:
     qs = f"?{request.url.query}" if request.url.query else ""
-    return RedirectResponse(url=f"/login/google/authorized{qs}", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    redirect = f"/login/google/authorized{qs}"
+    return RedirectResponse(url=redirect, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
 @auth_router.get("/login/github",  name="github.login", response_class=RedirectResponse)
@@ -221,7 +228,8 @@ async def github_authorized(request: Request) -> RedirectResponse:
 @auth_router.get("/login/github/callback", response_class=RedirectResponse)
 async def github_callback_compat(request: Request) -> RedirectResponse:
     qs = f"?{request.url.query}" if request.url.query else ""
-    return RedirectResponse(url=f"/login/github/authorized{qs}", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    redirect = f"/login/github/authorized{qs}"
+    return RedirectResponse(url=redirect, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
 @auth_router.get("/logout", response_class=RedirectResponse)

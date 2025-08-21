@@ -43,13 +43,19 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
 def create_app():
     """Create and configure the FastAPI application."""
-    app = FastAPI(title="QueryWeaver", description="Text2SQL with Graph-Powered Schema Understanding")
+    app = FastAPI(
+        title="QueryWeaver",
+        description=(
+            "Text2SQL with "
+            "Graph-Powered Schema Understanding"
+        ),
+    )
 
     # Get secret key for sessions
-    secret_key = os.getenv("FLASK_SECRET_KEY")
+    secret_key = os.getenv("FASTAPI_SECRET_KEY")
     if not secret_key:
         secret_key = secrets.token_hex(32)
-        logging.warning("FLASK_SECRET_KEY not set, using generated key. Set this in production!")
+        logging.warning("FASTAPI_SECRET_KEY not set, using generated key. Set this in production!")
 
     # Add session middleware with explicit settings to ensure OAuth state persists
     app.add_middleware(

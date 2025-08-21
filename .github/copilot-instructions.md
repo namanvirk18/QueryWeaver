@@ -126,8 +126,8 @@ make clean
 
 ```bash
 # REQUIRED for FastAPI to start
-FLASK_SECRET_KEY=your_super_secret_key_here
-FLASK_DEBUG=False
+FASTAPI_SECRET_KEY=your_super_secret_key_here
+FASTAPI_DEBUG=False
 
 # REQUIRED for database connection (most functionality)
 FALKORDB_HOST=localhost
@@ -146,8 +146,8 @@ GITHUB_CLIENT_SECRET=your_github_client_secret
 
 **For testing in CI/development**, minimal `.env` setup:
 ```bash
-FLASK_SECRET_KEY=test-secret-key
-FLASK_DEBUG=False
+FASTAPI_SECRET_KEY=test-secret-key
+FASTAPI_DEBUG=False
 FALKORDB_HOST=localhost
 FALKORDB_PORT=6379
 ```

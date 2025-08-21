@@ -42,7 +42,6 @@ jobs:
         pipenv sync --dev
 
     - name: Install frontend dependencies
-      if: "exists('app/package.json')"
       run: |
         node --version || true
         npm --version || true
@@ -51,21 +50,16 @@ jobs:
     - name: Create test environment file
       run: |
         cp .env.example .env
-        echo "FLASK_SECRET_KEY=test-secret-key" >> .env
-        echo "FLASK_DEBUG=False" >> .env
+        echo "FASTAPI_SECRET_KEY=test-secret-key" >> .env
+        echo "FASTAPI_DEBUG=False" >> .env
 
     - name: Run unit tests
       run: |
         pipenv run pytest tests/ -k "not e2e" --verbose
 
-    - name: Run pylint
+    - name: Run lint
       run: |
-        pipenv run pylint "$(git ls-files '*.py')" || true
-
-    - name: Run frontend lint
-      if: "exists('app/package.json')"
-      run: |
-        (cd app && npm run lint)
+        make lint
 
   e2e-tests:
     runs-on: ubuntu-latest
@@ -109,8 +103,8 @@ jobs:
         cp .env.example .env
         echo "FALKORDB_HOST=localhost" >> .env
         echo "FALKORDB_PORT=6379" >> .env
-        echo "FLASK_SECRET_KEY=test-secret-key-for-ci" >> .env
-        echo "FLASK_DEBUG=False" >> .env
+        echo "FASTAPI_SECRET_KEY=test-secret-key-for-ci" >> .env
+        echo "FASTAPI_DEBUG=False" >> .env
 
     - name: Wait for FalkorDB
       run: |

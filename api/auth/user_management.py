@@ -298,7 +298,7 @@ def token_required(func):
                     detail="Unauthorized - Please log in"
                 )
 
-            # Attach user_id to request.state (like Flask's g.user_id)
+            # Attach user_id to request.state (like FASTAPI's g.user_id)
             request.state.user_id = user_info.get("id")
             if not request.state.user_id:
                 request.session.pop("user_info", None)

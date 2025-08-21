@@ -15,7 +15,9 @@ class TestBasicFunctionality:
 
         # Check that the page title contains QueryWeaver
         title = home_page.get_page_title()
-        assert "QueryWeaver" in title or "Text2SQL" in title
+        assert (
+            "QueryWeaver" in title or "Text2SQL" in title
+        )
 
     def test_application_structure(self, page_with_base_url):
         """Test that key UI elements are present."""
@@ -55,9 +57,7 @@ class TestBasicFunctionality:
         home_page = HomePage(page_with_base_url)
         home_page.navigate_to_home()
 
-        # This test would require authentication
-        # Placeholder for when auth is set up
-        pass
+        # This test would require authentication; placeholder for future test
 
     def test_responsive_design(self, page_with_base_url):
         """Test responsive design at different screen sizes."""
@@ -90,5 +90,7 @@ class TestBasicFunctionality:
 
         # Should handle 404 gracefully
         # Could be 404 page or redirect to home
-        response_status = page.evaluate("() => window.fetch('/nonexistent-route').then(r => r.status)")
-        assert response_status in [404, 302, 200]  # Various valid responses
+        response_status = page.evaluate(
+            "() => window.fetch('/nonexistent-route').then(r => r.status)"
+        )
+        assert response_status in [404, 302, 200]

@@ -7,12 +7,20 @@
 {% endblock %}
 
 {% block content %}
+<!-- Top header with logo -->
+<header class="site-header" role="banner">
+  <div class="site-header-inner">
+      <img src="{{ url_for('static', path='icons/queryweaver.webp') }}" alt="QueryWeaver" />
+  </div>
+</header>
+
 <div class="landing-container">
 
   <!-- Left hero -->
   <section class="hero-left">
-    <h1 class="hero-title">Transform Plain<br/>English into Powerful<br/>SQL.</h1>
-    <p class="hero-sub">The intelligent AI solution that connects your business questions to data across multiple databases. Ask a question in plain English and get runnable SQL and visual results.</p>
+    <h1 class="hero-title">Transform Plain<br />English into Powerful<br />SQL.</h1>
+    <p class="hero-sub">The intelligent AI solution that connects your business questions to data across multiple
+      databases. Ask a question in plain English and get runnable SQL and visual results.</p>
 
     <div class="hero-ctas">
       <a href="{{ url_for('auth.chat') }}" class="btn-pill">Sign Up for Free</a>
@@ -24,14 +32,16 @@
   <aside class="demo-card">
     <div class="demo-inner">
       <div class="demo-label">Your Business Question:</div>
-      <div class="demo-question">Which customers from Germany who bought 'Chai' also have an open support ticket in Salesforce?</div>
+      <div class="demo-question">Which customers from Germany who bought 'Chai' also have an open support ticket in
+        Salesforce?</div>
 
       <div class="demo-sql-header">
         <div class="demo-label">Generated SQL:</div>
         <div class="demo-success" style="display:none;">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="8" cy="8" r="8" fill="#10B981"/>
-            <path d="M5.5 8L7 9.5L10.5 6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="8" cy="8" r="8" fill="#10B981" />
+            <path d="M5.5 8L7 9.5L10.5 6" stroke="white" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
           </svg>
           <span>Success</span>
         </div>
@@ -43,7 +53,7 @@
       </div>
     </div>
     <script>
-      (function(){
+      (function () {
         const examples = [
           {
             q: "Which customers from Germany who bought 'Chai' also have an open support ticket in Salesforce?",
@@ -68,22 +78,44 @@
         let typingTimer = null;
         const typingSpeed = 15; // ms per character
 
+        function escapeHtml(s){
+          return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        // very small client-side SQL highlighter (runs after typing completes)
+        function highlightSQL(sql){
+          if(!sql) return '';
+          // escape first
+          let out = escapeHtml(sql);
+          // strings (single quotes)
+          out = out.replace(/('[^']*')/g, '<span class="sql-string">$1</span>');
+          // keywords
+          out = out.replace(/\b(SELECT|FROM|JOIN|ON|WHERE|AND|OR|GROUP|BY|ORDER|LIMIT|AS|IN|IS|NULL|INNER|LEFT|RIGHT|OUTER)\b/gi,
+            function(m){ return '<span class="sql-keyword">'+m+'</span>'; });
+          // aggregate/functions
+          out = out.replace(/\b(COUNT|SUM|AVG|MIN|MAX)\b/gi, function(m){ return '<span class="sql-func">'+m+'</span>'; });
+          // numbers
+          out = out.replace(/\b(\d+\.?\d*)\b/g, '<span class="sql-number">$1</span>');
+          return out;
+        }
+
         function renderFull(i){
           const ex = examples[i % examples.length];
           if(qEl) qEl.textContent = ex.q;
           if(sEl) {
             sEl.classList.remove('typing');
-            sEl.textContent = ex.sql;
+            // show highlighted SQL after typing completes
+            sEl.innerHTML = highlightSQL(ex.sql);
           }
           if(successEl) successEl.style.display = 'flex';
         }
 
-        function typeSql(text){
-          if(!sEl) return;
+        function typeSql(text) {
+          if (!sEl) return;
           // hide success while typing
-          if(successEl) successEl.style.display = 'none';
+          if (successEl) successEl.style.display = 'none';
           // stop any previous typing
-          if(typingTimer) {
+          if (typingTimer) {
             clearInterval(typingTimer);
             typingTimer = null;
           }
@@ -92,22 +124,24 @@
           let pos = 0;
           typingTimer = setInterval(() => {
             pos += 1;
-            sEl.textContent = text.slice(0, pos);
-            if(pos >= text.length){
+            // progressively render highlighted HTML for the substring so colors appear while typing
+            if(sEl) sEl.innerHTML = highlightSQL(text.slice(0, pos));
+            if (pos >= text.length) {
               clearInterval(typingTimer);
               typingTimer = null;
               sEl.classList.remove('typing');
+              if (sEl) sEl.innerHTML = highlightSQL(text);
               // show success when typing completes
-              if(successEl) successEl.style.display = 'flex';
+              if (successEl) successEl.style.display = 'flex';
             }
           }, typingSpeed);
         }
 
-        if(btn){
-          btn.addEventListener('click', function(){
+        if (btn) {
+          btn.addEventListener('click', function () {
             idx = (idx + 1) % examples.length;
             const ex = examples[idx];
-            if(qEl) qEl.textContent = ex.q;
+            if (qEl) qEl.textContent = ex.q;
             // animate SQL typing
             typeSql(ex.sql);
           });
@@ -115,12 +149,63 @@
 
         // initial render: use typing animation for first example too
         const firstExample = examples[0];
-        if(qEl) qEl.textContent = firstExample.q;
+        if (qEl) qEl.textContent = firstExample.q;
         typeSql(firstExample.sql);
       })();
     </script>
+</div>
+</aside>
+
+<!-- Feature boxes -->
+<section class="features-row" aria-label="Key features">
+  <div class="feature-card">
+    <div class="feature-icon" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        class="h-6 w-6 text-primary-blue transition-transform group-hover:rotate-6">
+        <circle cx="18" cy="5" r="3"></circle>
+        <circle cx="6" cy="12" r="3"></circle>
+        <circle cx="18" cy="19" r="3"></circle>
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+      </svg>
     </div>
-  </aside>
+    <h3 class="feature-title">Knowledge Graph Power</h3>
+    <p class="feature-desc">Goes beyond simple column matching to understand complex business logic and relationships in
+      your data.</p>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-icon" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        class="h-6 w-6 text-primary-blue transition-transform group-hover:scale-110">
+        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+      </svg>
+    </div>
+    <h3 class="feature-title">Multi-Database Joins</h3>
+    <p class="feature-desc">Ask a single question and get answers from disparate sources like PostgreSQL and Salesforce
+      in one go.</p>
+  </div>
+
+  <div class="feature-card">
+    <div class="feature-icon" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        class="h-6 w-6 text-primary-blue transition-transform group-hover:animate-pulse">
+        <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 9 7c0 1.3.5 2.6 1.5 3.5.7.8 1.3 1.5 1.5 2.5">
+        </path>
+        <path d="M9 18h6"></path>
+        <path d="M10 22h4"></path>
+      </svg>
+    </div>
+    <h3 class="feature-title">Proactive Guidance</h3>
+    <p class="feature-desc">Get intelligent suggestions to clarify ambiguity and optimize your queries before you even
+      run them.</p>
+  </div>
+</section>
 
 </div>
 {% endblock %}

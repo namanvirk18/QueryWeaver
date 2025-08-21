@@ -1,16 +1,16 @@
-"""
-Playwright configuration for E2E tests.
-"""
-import pytest
+"""Playwright configuration for E2E tests."""
+
+import os
 import subprocess
 import time
+
+import pytest
 import requests
 
 
 @pytest.fixture(scope="session")
 def fastapi_app():
     """Start the FastAPI application for testing."""
-    import os
 
     # Get the project root directory (parent of tests directory)
     current_dir = os.path.dirname(os.path.abspath(__file__))
