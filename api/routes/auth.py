@@ -193,7 +193,7 @@ def _authenticate_email_user(email: str, password: str):
         """
         organizations_graph.query(update_query, {"email": email})
 
-        logging.info("EMAIL USER AUTHENTICATED: email=%s", _sanitize_for_log(email))
+        logging.info("EMAIL USER AUTHENTICATED: email=%r", _sanitize_for_log(email))
         return True, {"identity": identity, "user": user}
 
     except Exception as e:
