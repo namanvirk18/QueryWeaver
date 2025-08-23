@@ -343,11 +343,6 @@
   background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
 }
 
-.toolbar-button[aria-pressed="true"] {
-  background: var(--falkor-accent, rgba(150,120,220,0.22));
-  transform: translateY(-4px) scale(1.03);
-}
-
 #toolbar-buttons {
   display: flex;
   flex-direction: column;
@@ -364,19 +359,83 @@
   flex-shrink: 0;
 }
 
-@media (max-width: 768px) {
-  #left-toolbar {
-    left: 8px;
-    top: 12px;
-    bottom: auto;
-    width: auto;
-    height: 48px;
-    padding: 4px;
-    border-radius: 8px;
-    flex-direction: row;
-    align-items: center;
-  }
-  #left-toolbar-inner { flex-direction: row; gap: 6px; }
+/* Collapsed state: only show the burger button. Remove background/border/shadow so the bar is unobtrusive. */
+#left-toolbar.collapsed {
+  /* minimize width to avoid blocking content */
+  width: 0px;
+  padding: 0;
+  transition: width 220ms ease, padding 220ms ease, background 200ms ease;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  align-items: flex-start; /* keep burger at top */
+  overflow: visible;
+  position: relative; /* allow z-index for inner button */
+  pointer-events: none; /* let clicks pass through, but burger will override */
 }
+
+#left-toolbar.collapsed .toolbar-button {
+  display: none; /* hide all toolbar buttons */
+}
+
+#left-toolbar.collapsed #burger-toggle-btn {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  margin: 6px 0;
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 9999; /* keep on top so it's always clickable */
+  pointer-events: auto;
+}
+
+/* Mobile fallback: without JS, default to only the burger visible on small viewports */
+@media (max-width: 767px) {
+  #left-toolbar.collapsed {
+    width: 0px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    align-items: flex-start;
+    pointer-events: none;
+  }
+  
+  /* When NOT collapsed on mobile, show full toolbar */
+  #left-toolbar:not(.collapsed) {
+    width: 48px;
+    padding: 6px 6px;
+    background: var(--bg-tertiary, rgba(255,255,255,0.02));
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    border: 1px solid var(--border-color, rgba(255,255,255,0.03));
+    backdrop-filter: blur(6px);
+    align-items: center;
+    pointer-events: auto;
+    z-index: 1050;
+  }
+  
+  /* On mobile hide buttons only when explicitly collapsed (so burger can open toolbar) */
+  #left-toolbar.collapsed .toolbar-button { display: none; }
+  #left-toolbar.collapsed #burger-toggle-btn { 
+    display: flex; 
+    width: 48px; 
+    height: 48px; 
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    pointer-events: auto;
+  }
+  /* When not collapsed, show toolbar buttons as normal */
+  #left-toolbar:not(.collapsed) .toolbar-button { display: flex; }
+  #left-toolbar:not(.collapsed) #burger-toggle-btn { 
+    display: flex; 
+    position: relative;
+    top: auto;
+    left: auto;
+    pointer-events: auto;
+  }
+}
+
 
 
