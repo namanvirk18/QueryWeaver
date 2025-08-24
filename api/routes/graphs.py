@@ -529,23 +529,14 @@ async def confirm_destructive_operation(request: Request, graph_id: str, confirm
 
     # Create a generator function for streaming the confirmation response
     async def generate_confirmation():
-        # Start timing for confirmation process
-        confirmation_start = time.perf_counter()
-        logging.info("Starting destructive operation confirmation process")
-        
         if confirmation == "CONFIRM":
             try:
-                db_prep_start = time.perf_counter()
-                db_description, db_url = await get_db_description(graph_id)
+                db_description, db_url = get_db_description(graph_id)
 
                 # Determine database type and get appropriate loader
                 db_type, loader_class = get_database_type_and_loader(db_url)
-                db_prep_elapsed = time.perf_counter() - db_prep_start
-                logging.info("Database preparation for confirmation took %.2f seconds", db_prep_elapsed)
 
                 if not loader_class:
-                    confirmation_elapsed = time.perf_counter() - confirmation_start
-                    logging.info("Confirmation process failed (no loader) - Total time: %.2f seconds", confirmation_elapsed)
                     yield json.dumps({
                         "type": "error", 
                         "message": "Unable to determine database type"
@@ -557,17 +548,10 @@ async def confirm_destructive_operation(request: Request, graph_id: str, confirm
                 yield json.dumps(step) + MESSAGE_DELIMITER
 
                 # Check if this query modifies the database schema using appropriate loader
-                schema_check_start = time.perf_counter()
                 is_schema_modifying, operation_type = (
                     loader_class.is_schema_modifying_query(sql_query)
                 )
-                schema_check_elapsed = time.perf_counter() - schema_check_start
-                logging.info("Schema modification check for confirmation took %.2f seconds", schema_check_elapsed)
-
-                sql_exec_start = time.perf_counter()
                 query_results = loader_class.execute_sql_query(sql_query, db_url)
-                sql_exec_elapsed = time.perf_counter() - sql_exec_start
-                logging.info("Confirmed SQL query execution took %.2f seconds", sql_exec_elapsed)
                 yield json.dumps(
                     {
                         "type": "query_result",
@@ -581,12 +565,9 @@ async def confirm_destructive_operation(request: Request, graph_id: str, confirm
                            "message": "Step 3: Schema change detected - refreshing graph..."}
                     yield json.dumps(step) + MESSAGE_DELIMITER
 
-                    refresh_start = time.perf_counter()
                     refresh_success, refresh_message = (
                         loader_class.refresh_graph_schema(graph_id, db_url)
                     )
-                    refresh_elapsed = time.perf_counter() - refresh_start
-                    logging.info("Schema refresh for confirmation took %.2f seconds", refresh_elapsed)
 
                     if refresh_success:
                         yield json.dumps(
@@ -614,7 +595,6 @@ async def confirm_destructive_operation(request: Request, graph_id: str, confirm
                        "message": f"Step {step_num}: Generating user-friendly response"}
                 yield json.dumps(step) + MESSAGE_DELIMITER
 
-                response_format_start = time.perf_counter()
                 response_agent = ResponseFormatterAgent()
                 user_readable_response = response_agent.format_response(
                     user_query=queries_history[-1] if queries_history else "Destructive operation",
@@ -622,8 +602,6 @@ async def confirm_destructive_operation(request: Request, graph_id: str, confirm
                     query_results=query_results,
                     db_description=db_description
                 )
-                response_format_elapsed = time.perf_counter() - response_format_start
-                logging.info("Response formatting for confirmation took %.2f seconds", response_format_elapsed)
 
                 yield json.dumps(
                     {
@@ -632,21 +610,13 @@ async def confirm_destructive_operation(request: Request, graph_id: str, confirm
                     }
                 ) + MESSAGE_DELIMITER
 
-                # Log overall confirmation completion time
-                confirmation_elapsed = time.perf_counter() - confirmation_start
-                logging.info("Destructive operation confirmation completed successfully - Total time: %.2f seconds", confirmation_elapsed)
-
             except Exception as e:
-                confirmation_elapsed = time.perf_counter() - confirmation_start
                 logging.error("Error executing confirmed SQL query: %s", str(e))
-                logging.info("Confirmation process failed during execution - Total time: %.2f seconds", confirmation_elapsed)
                 yield json.dumps(
                     {"type": "error", "message": "Error executing query"}
                 ) + MESSAGE_DELIMITER
         else:
             # User cancelled or provided invalid confirmation
-            confirmation_elapsed = time.perf_counter() - confirmation_start
-            logging.info("Destructive operation cancelled by user - Time until cancellation: %.2f seconds", confirmation_elapsed)
             yield json.dumps(
                 {
                     "type": "operation_cancelled",
