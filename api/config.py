@@ -57,7 +57,6 @@ class Config:
     COMPLETION_MODEL = "azure/gpt-4.1"
     VALIDATOR_MODEL = "azure/gpt-4.1"
     TEMPERATURE = 0
-    DB_MAX_ROWS: int = 500  # pylint: disable=invalid-name
     DB_MAX_DISTINCT: int = 100  # pylint: disable=invalid-name
     DB_UNIQUENESS_THRESHOLD: float = 0.5  # pylint: disable=invalid-name
     # client = boto3.client('sts')
