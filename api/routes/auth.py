@@ -12,7 +12,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from authlib.common.errors import AuthlibBaseError
 from authlib.integrations.starlette_client import OAuth
-from jinja2 import Environment, FileSystemLoader, FileSystemBytecodeCache
+from jinja2 import Environment, FileSystemLoader, FileSystemBytecodeCache, select_autoescape
 from starlette.config import Config
 
 from api.auth.user_management import validate_and_cache_user
@@ -21,7 +21,7 @@ from api.auth.user_management import validate_and_cache_user
 auth_router = APIRouter()
 TEMPLATES_DIR = str((Path(__file__).resolve().parents[1] / "../app/templates").resolve())
 
-TEMPLATES_CACHE_DIR = "./.jinja_cache"
+TEMPLATES_CACHE_DIR = "/tmp/jinja_cache"
 os.makedirs(TEMPLATES_CACHE_DIR, exist_ok=True)  # ✅ ensures the folder exists
 
 templates = Jinja2Templates(
@@ -31,7 +31,8 @@ templates = Jinja2Templates(
             directory=TEMPLATES_CACHE_DIR,
             pattern="%s.cache"
         ),
-        auto_reload=True
+        auto_reload=True,
+        autoescape=select_autoescape(['html', 'xml', 'j2'])
     )
 )
 
