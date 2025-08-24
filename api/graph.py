@@ -36,7 +36,7 @@ class Descriptions(BaseModel):
     columns_descriptions: list[ColumnDescription]
 
 
-async def get_db_description(graph_id: str) -> (str, str):
+async def get_db_description(graph_id: str) -> tuple[str, str]:
     """Get the database description from the graph."""
     graph = db.select_graph(graph_id)
     query_result = await graph.query(
@@ -101,14 +101,14 @@ async def _embed_and_query(
 
 async def _find_tables(
     graph,
-    descriptions: List[TableDescription]
+    embeddings: List[List[float]]
 ) -> List[Dict[str, Any]]:
     """
-    Find tables based on table descriptions.
+    Find tables based on pre-computed embeddings.
 
     Args:
         graph: The graph database instance.
-        descriptions: List of table descriptions to search for.
+        embeddings: Pre-computed embeddings for the table descriptions.
 
     Returns:
         List of matching table information.
@@ -125,24 +125,26 @@ async def _find_tables(
             nullable: columns.nullable
         })
     """
+    
     tasks = [
-        _embed_and_query(graph, table.description, query)
-        for table in descriptions
+        _query_graph(graph, query, {"embedding": embedding})
+        for embedding in embeddings
     ]
+    
     results = await asyncio.gather(*tasks)
     return [row for rows in results for row in rows]
 
 
 async def _find_tables_by_columns(
     graph,
-    descriptions: List[ColumnDescription]
+    embeddings: List[List[float]]
 ) -> List[Dict[str, Any]]:
     """
-    Find tables based on column descriptions.
+    Find tables based on pre-computed embeddings for column descriptions.
 
     Args:
         graph: The graph database instance.
-        descriptions: List of column descriptions to search for.
+        embeddings: Pre-computed embeddings for the column descriptions.
 
     Returns:
         List of matching table information.
@@ -163,10 +165,12 @@ async def _find_tables_by_columns(
                 nullable: columns.nullable
             })
     """
+    
     tasks = [
-        _embed_and_query(graph, col.description, query)
-        for col in descriptions
+        _query_graph(graph, query, {"embedding": embedding})
+        for embedding in embeddings
     ]
+    
     results = await asyncio.gather(*tasks)
     return [row for rows in results for row in rows]
 
@@ -307,16 +311,39 @@ async def find(
 
     json_data = json.loads(completion_result.choices[0].message.content)
     descriptions = Descriptions(**json_data)
+    descriptions_text = [desc.description for desc in descriptions.tables_descriptions] + [desc.description for desc in descriptions.columns_descriptions]
+    embedding_results = Config.EMBEDDING_MODEL.embed(descriptions_text)
+    
+    # Split embeddings back into table and column embeddings
+    table_embeddings = embedding_results[:len(descriptions.tables_descriptions)]
+    column_embeddings = embedding_results[len(descriptions.tables_descriptions):]
 
-    tables_des = await _find_tables(graph, descriptions.tables_descriptions)
-    tasks = [
-        _find_tables_by_columns(graph, descriptions.columns_descriptions),
-        _find_tables_sphere(graph, [t[0] for t in tables_des]),
-        _find_connecting_tables(graph, [t[0] for t in tables_des])
-    ]
-    tables_by_columns_des, tables_by_sphere, tables_by_route = await asyncio.gather(
-        *tasks
-    )
+    main_tasks = []
+    
+    if table_embeddings:
+        main_tasks.append(_find_tables(graph, table_embeddings))
+    if column_embeddings:
+        main_tasks.append(_find_tables_by_columns(graph, column_embeddings))
+    
+    # Execute the main embedding-based searches in parallel
+    results = await asyncio.gather(*main_tasks)
+    
+    # Unpack results based on what tasks we ran
+    tables_des = results[0] if table_embeddings else []
+    tables_by_columns_des = results[1] if (table_embeddings and column_embeddings) else []
+
+    # Extract table names once for reuse
+    found_table_names = [t[0] for t in tables_des] if tables_des else []
+    
+    # Only run sphere and connecting searches if we found tables
+    if found_table_names:
+        secondary_tasks = [
+            _find_tables_sphere(graph, found_table_names),
+            _find_connecting_tables(graph, found_table_names)
+        ]
+        tables_by_sphere, tables_by_route = await asyncio.gather(*secondary_tasks)
+    else:
+        tables_by_sphere, tables_by_route = [], []
 
     combined_tables = _get_unique_tables(
         tables_des + tables_by_columns_des + tables_by_route + tables_by_sphere

@@ -288,19 +288,15 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
         
         agent_rel = RelevancyAgent(queries_history, result_history)
         agent_an = AnalysisAgent(queries_history, result_history)
-        step1_start = time.perf_counter()
 
         step = {"type": "reasoning_step",
                 "message": "Step 1: Analyzing user query and generating SQL..."}
         yield json.dumps(step) + MESSAGE_DELIMITER
         # Ensure the database description is loaded
-        db_prep_start = time.perf_counter()
         db_description, db_url = await get_db_description(graph_id)
         
         # Determine database type and get appropriate loader
         db_type, loader_class = get_database_type_and_loader(db_url)
-        db_prep_elapsed = time.perf_counter() - db_prep_start
-        logging.info("Database preparation took %.2f seconds", db_prep_elapsed)
 
         if not loader_class:
             overall_elapsed = time.perf_counter() - overall_start
@@ -319,12 +315,9 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
         ))
 
         logging.info("Starting relevancy check and graph analysis concurrently")
-        rel_start = time.perf_counter()
         
         # Wait for relevancy check first
         answer_rel = await relevancy_task
-        rel_elapsed = time.perf_counter() - rel_start
-        logging.info("Relevancy check took %.2f seconds", rel_elapsed)
         
         if answer_rel["status"] != "On-topic":
             # Cancel the find task since query is off-topic
@@ -340,25 +333,17 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
             }
             logging.info("SQL Fail reason: %s", answer_rel["reason"])
             yield json.dumps(step) + MESSAGE_DELIMITER
-            # Total time for the pre-analysis phase
-            step1_elapsed = time.perf_counter() - step1_start
+            # Total time for off-topic query
             overall_elapsed = time.perf_counter() - overall_start
-            logging.info("Step 1 (relevancy + prep) took %.2f seconds", step1_elapsed)
             logging.info("Query processing completed (off-topic) - Total time: %.2f seconds", overall_elapsed)
         else:
             # Query is on-topic, wait for find results
-            find_start = time.perf_counter()
             result = await find_task
-            find_elapsed = time.perf_counter() - find_start
-            logging.info("Graph analysis (find) took %.2f seconds", find_elapsed)
 
             logging.info("Starting SQL generation with analysis agent")
-            analysis_start = time.perf_counter()
             answer_an = agent_an.get_analysis(
                 queries_history[-1], result, db_description, instructions
             )
-            analysis_elapsed = time.perf_counter() - analysis_start
-            logging.info("SQL generation took %.2f seconds", analysis_elapsed)
 
             logging.info("Generated SQL query: %s", answer_an['sql_query'])
             yield json.dumps(
@@ -425,9 +410,9 @@ What this will do:
                             "operation_type": sql_type
                         }
                     ) + MESSAGE_DELIMITER
-                    # Log timing for destructive operation that requires confirmation
+                    # Log end-to-end time for destructive operation that requires confirmation
                     overall_elapsed = time.perf_counter() - overall_start
-                    logging.info("Query processing halted for confirmation - Time until confirmation: %.2f seconds", overall_elapsed)
+                    logging.info("Query processing halted for confirmation - Total time: %.2f seconds", overall_elapsed)
                     return  # Stop here and wait for user confirmation
 
                 try:
@@ -435,17 +420,11 @@ What this will do:
                     yield json.dumps(step) + MESSAGE_DELIMITER
 
                     # Check if this query modifies the database schema using the appropriate loader
-                    schema_check_start = time.perf_counter()
                     is_schema_modifying, operation_type = (
                         loader_class.is_schema_modifying_query(sql_query)
                     )
-                    schema_check_elapsed = time.perf_counter() - schema_check_start
-                    logging.info("Schema modification check took %.2f seconds", schema_check_elapsed)
 
-                    sql_exec_start = time.perf_counter()
                     query_results = loader_class.execute_sql_query(answer_an["sql_query"], db_url)
-                    sql_exec_elapsed = time.perf_counter() - sql_exec_start
-                    logging.info("SQL query execution took %.2f seconds", sql_exec_elapsed)
                     
                     yield json.dumps(
                         {
@@ -461,12 +440,9 @@ What this will do:
                                          "refreshing graph...")}
                         yield json.dumps(step) + MESSAGE_DELIMITER
 
-                        refresh_start = time.perf_counter()
                         refresh_result = loader_class.refresh_graph_schema(
                             graph_id, db_url)
                         refresh_success, refresh_message = refresh_result
-                        refresh_elapsed = time.perf_counter() - refresh_start
-                        logging.info("Schema refresh took %.2f seconds", refresh_elapsed)
 
                         if refresh_success:
                             refresh_msg = (f"✅ Schema change detected "
@@ -498,7 +474,6 @@ What this will do:
                            "message": f"Step {step_num}: Generating user-friendly response"}
                     yield json.dumps(step) + MESSAGE_DELIMITER
 
-                    response_format_start = time.perf_counter()
                     response_agent = ResponseFormatterAgent()
                     user_readable_response = response_agent.format_response(
                         user_query=queries_history[-1],
@@ -506,8 +481,6 @@ What this will do:
                         query_results=query_results,
                         db_description=db_description
                     )
-                    response_format_elapsed = time.perf_counter() - response_format_start
-                    logging.info("Response formatting took %.2f seconds", response_format_elapsed)
 
                     yield json.dumps(
                         {
@@ -531,6 +504,10 @@ What this will do:
                 # SQL query is not valid/translatable
                 overall_elapsed = time.perf_counter() - overall_start
                 logging.info("Query processing completed (non-translatable SQL) - Total time: %.2f seconds", overall_elapsed)
+
+        # Log timing summary at the end of processing
+        overall_elapsed = time.perf_counter() - overall_start
+        logging.info("Query processing pipeline completed - Total time: %.2f seconds", overall_elapsed)
 
     return StreamingResponse(generate(), media_type="application/json")
 
