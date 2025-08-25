@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from api.auth.oauth_handlers import setup_oauth_handlers
 from api.routes.auth import auth_router, init_auth
 from api.routes.graphs import graphs_router
 from api.routes.database import database_router
@@ -82,6 +83,8 @@ def create_app():
     app.include_router(auth_router)
     app.include_router(graphs_router, prefix="/graphs")
     app.include_router(database_router)
+
+    setup_oauth_handlers(app, app.state.oauth)
 
     @app.exception_handler(Exception)
     async def handle_oauth_error(request: Request, exc: Exception):
