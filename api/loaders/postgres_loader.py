@@ -365,7 +365,7 @@ class PostgresLoader(BaseLoader):
         return False, ""
 
     @staticmethod
-    def refresh_graph_schema(graph_id: str, db_url: str) -> Tuple[bool, str]:
+    async def refresh_graph_schema(graph_id: str, db_url: str) -> Tuple[bool, str]:
         """
         Refresh the graph schema by clearing existing data and reloading from the database.
 
@@ -385,7 +385,7 @@ class PostgresLoader(BaseLoader):
             # Clear existing graph data
             # Drop current graph before reloading
             graph = db.select_graph(graph_id)
-            graph.delete()
+            await graph.delete()
 
             # Extract prefix from graph_id (remove database name part)
             # graph_id format is typically "prefix_database_name"

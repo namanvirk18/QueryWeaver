@@ -68,7 +68,7 @@ class RelevancyAgent(BaseAgent):
                 self.messages.append({"role": "user", "content": query})
                 self.messages.append({"role": "assistant", "content": result})
 
-    def get_answer(self, user_question: str, database_desc: dict) -> dict:
+    async def get_answer(self, user_question: str, database_desc: dict) -> dict:
         """Get relevancy assessment for user question against database description."""
         self.messages.append(
             {

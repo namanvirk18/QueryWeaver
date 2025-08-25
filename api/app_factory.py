@@ -99,11 +99,4 @@ def create_app():
         # For other errors, let them bubble up
         raise exc
 
-    # Add template globals
-    @app.middleware("http")
-    async def add_template_globals(request: Request, call_next):
-        request.state.google_tag_manager_id = os.getenv("GOOGLE_TAG_MANAGER_ID")
-        response = await call_next(request)
-        return response
-
     return app

@@ -9,7 +9,7 @@ from api.extensions import db
 from api.utils import generate_db_description
 
 
-def load_to_graph(
+async def load_to_graph(
     graph_id: str,
     entities: dict,
     relationships: dict,
@@ -33,7 +33,7 @@ def load_to_graph(
 
     try:
         # Create vector indices
-        graph.query(
+        await graph.query(
             """
             CREATE VECTOR INDEX FOR (t:Table) ON (t.embedding)
             OPTIONS {dimension:$size, similarityFunction:'euclidean'}
@@ -41,19 +41,19 @@ def load_to_graph(
             {"size": vec_len},
         )
 
-        graph.query(
+        await graph.query(
             """
             CREATE VECTOR INDEX FOR (c:Column) ON (c.embedding)
             OPTIONS {dimension:$size, similarityFunction:'euclidean'}
         """,
             {"size": vec_len},
         )
-        graph.query("CREATE INDEX FOR (p:Table) ON (p.name)")
+        await graph.query("CREATE INDEX FOR (p:Table) ON (p.name)")
     except Exception as e:
         print(f"Error creating vector indices: {str(e)}")
 
     db_des = generate_db_description(db_name=db_name, table_names=list(entities.keys()))
-    graph.query(
+    await graph.query(
         """
         CREATE (d:Database {
             name: $db_name,
@@ -70,7 +70,7 @@ def load_to_graph(
         fk = json.dumps(table_info.get("foreign_keys", []))
 
         # Create table node
-        graph.query(
+        await graph.query(
             """
             CREATE (t:Table {
                 name: $table_name,
@@ -123,7 +123,7 @@ def load_to_graph(
                 embed_columns.extend(embedding_result)
                 idx = 0
 
-            graph.query(
+            await graph.query(
                 """
                 MATCH (t:Table {name: $table_name})
                 CREATE (c:Column {
@@ -159,7 +159,7 @@ def load_to_graph(
 
             # Create relationship if both tables and columns exist
             try:
-                graph.query(
+                await graph.query(
                     """
                     MATCH (src:Column {name: $source_col})
                         -[:BELONGS_TO]->(source:Table {name: $source_table})
