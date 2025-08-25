@@ -63,6 +63,11 @@ button, input, select, textarea {
   text-decoration: underline;
 }
 
+#powered-by-falkordb img {
+  height:1.5em;
+  vertical-align:middle;
+}
+
 @media (max-width: 600px) {
   #powered-by-falkordb {
     font-size: 0.95em;
