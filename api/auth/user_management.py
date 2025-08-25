@@ -5,9 +5,7 @@ import time
 from functools import wraps
 from typing import Tuple, Optional, Dict, Any
 
-import requests
 from fastapi import Request, HTTPException, status
-from fastapi.responses import JSONResponse
 from authlib.integrations.starlette_client import OAuth
 
 from api.extensions import db

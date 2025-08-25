@@ -85,6 +85,7 @@ def _build_callback_url(request: Request, path: str) -> str:
 # ---- Routes ----
 @auth_router.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
+    """Handle the home page, rendering the landing page for unauthenticated users and the chat page for authenticated users."""
     user_info, is_authenticated_flag = await validate_and_cache_user(request)
 
     if not is_authenticated_flag:
