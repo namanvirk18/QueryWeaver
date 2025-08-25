@@ -161,6 +161,12 @@ async def google_authorized(request: Request) -> RedirectResponse:
         request.session["google_token"] = token
         request.session["token_validated_at"] = time.time()
 
+        # Call the registered Google callback handler if it exists to store user data.
+        handler = getattr(request.app.state, "google_callback_handler", None)
+        if handler:
+            # call the registered handler (await if async)
+            await handler(request, token, user_info)
+
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
 
     except AuthlibBaseError as e:
@@ -234,6 +240,12 @@ async def github_authorized(request: Request) -> RedirectResponse:
         }
         request.session["github_token"] = token
         request.session["token_validated_at"] = time.time()
+
+        # Call the registered GitHub callback handler if it exists to store user data.
+        handler = getattr(request.app.state, "github_callback_handler", None)
+        if handler:
+            # call the registered handler (await if async)
+            await handler(request, token, user_info)
 
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
 
