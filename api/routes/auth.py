@@ -36,6 +36,7 @@ templates = Jinja2Templates(
     )
 )
 
+templates.env.globals["google_tag_manager_id"] = os.getenv("GOOGLE_TAG_MANAGER_ID")
 
 # ---- Helpers ----
 def _get_provider_client(request: Request, provider: str):
