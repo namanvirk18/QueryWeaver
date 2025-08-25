@@ -242,7 +242,7 @@ async def find(
     graph_id: str,
     queries_history: List[str],
     db_description: str = None
-) -> List[Dict[str, Any]]:
+) -> List[List[Any]]:
     """
     Find the tables and columns relevant to the user's query.
 

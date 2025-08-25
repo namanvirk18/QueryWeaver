@@ -80,7 +80,7 @@ async def ensure_user_in_organizations(provider_user_id, email, name, provider, 
             EXISTS((user)<-[:AUTHENTICATES]-(:Identity)) AS had_other_identities
         """
 
-        result = organizations_graph.query(merge_query, {
+        result = await organizations_graph.query(merge_query, {
             "provider": provider,
             "provider_user_id": provider_user_id,
             "email": email,
@@ -145,7 +145,7 @@ async def update_identity_last_login(provider, provider_user_id):
         SET identity.last_login = timestamp()
         RETURN identity
         """
-        organizations_graph.query(update_query, {
+        await organizations_graph.query(update_query, {
             "provider": provider,
             "provider_user_id": provider_user_id
         })

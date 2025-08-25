@@ -141,8 +141,8 @@ async def get_graph_data(request: Request, graph_id: str):
     """
 
     try:
-        tables_res = graph.query(tables_query).result_set
-        links_res = graph.query(links_query).result_set
+        tables_res = await graph.query(tables_query).result_set
+        links_res = await graph.query(links_query).result_set
     except Exception as e:
         logging.error("Error querying graph data for %s: %s", sanitize_log_input(namespaced), e)
         return JSONResponse(content={"error": "Failed to read graph data"}, status_code=500)
