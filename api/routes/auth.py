@@ -92,10 +92,10 @@ async def home(request: Request) -> HTMLResponse:
 
     if not is_authenticated_flag:
         return templates.TemplateResponse(
-            "landing.j2", 
+            "landing.j2",
             {
-                "request": request, 
-                "is_authenticated": False, 
+                "request": request,
+                "is_authenticated": False,
                 "user_info": None
             }
         )
@@ -212,7 +212,7 @@ async def github_authorized(request: Request) -> RedirectResponse:
             return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
 
         user_info = resp.json()
-        
+
         # Get user email if not public
         email = user_info.get("email")
         if not email:

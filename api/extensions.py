@@ -17,7 +17,7 @@ else:
     try:
         # Create connection pool with explicit encoding settings
         pool = ConnectionPool.from_url(
-            url, 
+            url,
             decode_responses=True
         )
         db = FalkorDB(connection_pool=pool)
