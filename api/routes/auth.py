@@ -11,6 +11,8 @@ from fastapi import APIRouter, Request, HTTPException, status
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from authlib.common.errors import AuthlibBaseError
+from authlib.integrations.starlette_client import OAuth
+from jinja2 import Environment, FileSystemLoader, FileSystemBytecodeCache, select_autoescape
 from starlette.config import Config
 
 from api.auth.user_management import validate_and_cache_user
@@ -18,7 +20,22 @@ from api.auth.user_management import validate_and_cache_user
 # Router
 auth_router = APIRouter()
 TEMPLATES_DIR = str((Path(__file__).resolve().parents[1] / "../app/templates").resolve())
-templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+TEMPLATES_CACHE_DIR = "/tmp/jinja_cache"
+os.makedirs(TEMPLATES_CACHE_DIR, exist_ok=True)  # ✅ ensures the folder exists
+
+templates = Jinja2Templates(
+    env=Environment(
+        loader=FileSystemLoader(TEMPLATES_DIR),
+        bytecode_cache=FileSystemBytecodeCache(
+            directory=TEMPLATES_CACHE_DIR,
+            pattern="%s.cache"
+        ),
+        auto_reload=True,
+        autoescape=select_autoescape(['html', 'xml', 'j2'])
+    )
+)
+
 
 # ---- Helpers ----
 def _get_provider_client(request: Request, provider: str):
@@ -34,7 +51,13 @@ def _get_provider_client(request: Request, provider: str):
 
 def _clear_auth_session(session: dict):
     """Remove only auth-related keys from session instead of clearing everything."""
-    for key in ["user_info", "google_token", "github_token", "token_validated_at", "oauth_google_auth"]:
+    for key in [
+        "user_info",
+        "google_token",
+        "github_token",
+        "token_validated_at",
+        "oauth_google_auth",
+    ]:
         session.pop(key, None)
 
 @auth_router.get("/chat", name="auth.chat", response_class=HTMLResponse)
@@ -148,7 +171,8 @@ async def google_authorized(request: Request) -> RedirectResponse:
 @auth_router.get("/login/google/callback", response_class=RedirectResponse)
 async def google_callback_compat(request: Request) -> RedirectResponse:
     qs = f"?{request.url.query}" if request.url.query else ""
-    return RedirectResponse(url=f"/login/google/authorized{qs}", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    redirect = f"/login/google/authorized{qs}"
+    return RedirectResponse(url=redirect, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
 @auth_router.get("/login/github",  name="github.login", response_class=RedirectResponse)
@@ -221,7 +245,8 @@ async def github_authorized(request: Request) -> RedirectResponse:
 @auth_router.get("/login/github/callback", response_class=RedirectResponse)
 async def github_callback_compat(request: Request) -> RedirectResponse:
     qs = f"?{request.url.query}" if request.url.query else ""
-    return RedirectResponse(url=f"/login/github/authorized{qs}", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    redirect = f"/login/github/authorized{qs}"
+    return RedirectResponse(url=redirect, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
 @auth_router.get("/logout", response_class=RedirectResponse)
@@ -272,8 +297,8 @@ async def logout(request: Request) -> RedirectResponse:
 # ---- Hook for app factory ----
 def init_auth(app):
     """Initialize OAuth and sessions for the app."""
-    config = Config(".env")
-    from authlib.integrations.starlette_client import OAuth
+
+    config = Config(environ=os.environ)
     oauth = OAuth(config)
 
     google_client_id = os.getenv("GOOGLE_CLIENT_ID")

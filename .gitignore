@@ -18,3 +18,4 @@ tmp_*
 *.d.ts
 node_modules/
 /app/public/js/*
+.jinja_cache/

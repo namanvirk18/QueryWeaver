@@ -6,9 +6,8 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
-from typing import Dict, Any
 
-from fastapi import APIRouter, Request, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Request, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -29,16 +28,31 @@ graphs_router = APIRouter()
 
 
 class GraphData(BaseModel):
+    """Graph data model.
+
+    Args:
+        BaseModel (_type_): _description_
+    """
     database: str
 
 
 class ChatRequest(BaseModel):
+    """Chat request model.
+
+    Args:
+        BaseModel (_type_): _description_
+    """
     chat: list
     result: list = None
     instructions: str = None
 
 
 class ConfirmRequest(BaseModel):
+    """Confirmation request model.
+
+    Args:
+        BaseModel (_type_): _description_
+    """
     sql_query: str
     confirmation: str = ""
     chat: list = []
@@ -340,6 +354,9 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
             # Query is on-topic, wait for find results
             result = await find_task
 
+            logging.info("Calling to analysis agent with query: %s",
+                         sanitize_query(queries_history[-1]))
+
             logging.info("Starting SQL generation with analysis agent")
             answer_an = agent_an.get_analysis(
                 queries_history[-1], result, db_description, instructions
@@ -514,13 +531,21 @@ What this will do:
 
 @graphs_router.post("/{graph_id}/confirm")
 @token_required
-async def confirm_destructive_operation(request: Request, graph_id: str, confirm_data: ConfirmRequest):
+async def confirm_destructive_operation(
+    request: Request,
+    graph_id: str,
+    confirm_data: ConfirmRequest,
+):
     """
     Handle user confirmation for destructive SQL operations
     """
     graph_id = request.state.user_id + "_" + graph_id.strip()
-    
-    confirmation = confirm_data.confirmation.strip().upper() if hasattr(confirm_data, 'confirmation') else ""
+
+    if hasattr(confirm_data, 'confirmation'):
+        confirmation = confirm_data.confirmation.strip().upper()
+    else:
+        confirmation = ""
+
     sql_query = confirm_data.sql_query if hasattr(confirm_data, 'sql_query') else ""
     queries_history = confirm_data.chat if hasattr(confirm_data, 'chat') else []
 

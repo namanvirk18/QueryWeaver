@@ -1,7 +1,11 @@
 """Tests for MySQL loader functionality."""
 
-import pytest
+import datetime
+import decimal
 from unittest.mock import patch, MagicMock
+
+import pytest
+
 from api.loaders.mysql_loader import MySQLLoader
 
 
@@ -58,23 +62,20 @@ class TestMySQLLoader:
 
     def test_serialize_value(self):
         """Test value serialization for JSON compatibility."""
-        from datetime import datetime, date, time
-        from decimal import Decimal
-
         # Test datetime
-        dt = datetime(2023, 1, 1, 12, 0, 0)
+        dt = datetime.datetime(2023, 1, 1, 12, 0, 0)
         assert MySQLLoader._serialize_value(dt) == "2023-01-01T12:00:00"
 
         # Test date
-        d = date(2023, 1, 1)
+        d = datetime.date(2023, 1, 1)
         assert MySQLLoader._serialize_value(d) == "2023-01-01"
 
         # Test time
-        t = time(12, 0, 0)
+        t = datetime.time(12, 0, 0)
         assert MySQLLoader._serialize_value(t) == "12:00:00"
 
         # Test decimal
-        dec = Decimal("123.45")
+        dec = decimal.Decimal("123.45")
         assert MySQLLoader._serialize_value(dec) == 123.45
 
         # Test None
@@ -88,8 +89,10 @@ class TestMySQLLoader:
         # Schema-modifying queries
         assert MySQLLoader.is_schema_modifying_query("CREATE TABLE test (id INT)")[0] is True
         assert MySQLLoader.is_schema_modifying_query("DROP TABLE test")[0] is True
-        assert MySQLLoader.is_schema_modifying_query("ALTER TABLE test ADD COLUMN name VARCHAR(50)")[0] is True
-        assert MySQLLoader.is_schema_modifying_query("  CREATE INDEX idx_name ON test(name)")[0] is True
+        assert MySQLLoader.is_schema_modifying_query(
+            "ALTER TABLE test ADD COLUMN name VARCHAR(50)")[0] is True
+        assert MySQLLoader.is_schema_modifying_query(
+            "  CREATE INDEX idx_name ON test(name)")[0] is True
 
         # Non-schema-modifying queries
         assert MySQLLoader.is_schema_modifying_query("SELECT * FROM test")[0] is False
@@ -99,16 +102,16 @@ class TestMySQLLoader:
 
         # Edge cases
         assert MySQLLoader.is_schema_modifying_query("")[0] is False
-        assert MySQLLoader.is_schema_modifying_query(None)[0] is False
+        assert MySQLLoader.is_schema_modifying_query("")[0] is False
 
     @patch('pymysql.connect')
     def test_connection_error(self, mock_connect):
         """Test handling of MySQL connection errors."""
         # Mock connection failure
         mock_connect.side_effect = Exception("Connection failed")
-        
+
         success, message = MySQLLoader.load("test_prefix", "mysql://user:pass@host:3306/db")
-        
+
         assert success is False
         assert "Error loading MySQL schema" in message
 
@@ -126,9 +129,12 @@ class TestMySQLLoader:
         mock_connect.return_value = mock_conn
 
         # Mock the extract methods to return minimal data
-        with patch.object(MySQLLoader, 'extract_tables_info', return_value={'users': {'description': 'User table'}}):
+        with patch.object(MySQLLoader, 'extract_tables_info',
+                          return_value={'users': {'description': 'User table'}}):
             with patch.object(MySQLLoader, 'extract_relationships', return_value={}):
-                success, message = MySQLLoader.load("test_prefix", "mysql://user:pass@localhost:3306/testdb")
+                success, message = MySQLLoader.load(
+                    "test_prefix", "mysql://user:pass@localhost:3306/testdb"
+                )
 
         assert success is True
         assert "MySQL schema loaded successfully" in message

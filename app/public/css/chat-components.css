@@ -28,6 +28,24 @@
   background-color: var(--falkor-secondary);
 }
 
+@media (max-width: 768px) {
+  .chat-messages {
+    padding: 2px;
+  }
+
+  .chat-container {
+    padding-right: 10px;
+    padding-left: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    /* Ensure no horizontal overflow */
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    /* Ensure content is accessible when toolbar is open */
+    transition: margin-left 220ms ease;
+  }
+}
 .message-container {
   display: flex;
   flex-direction: row;

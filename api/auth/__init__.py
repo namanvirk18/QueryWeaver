@@ -1,10 +1,14 @@
-# Authentication module for text2sql API
+"""Authentication helpers exported by the auth package.
+
+This module exposes commonly used authentication helpers for the
+application and keeps the package's public API tidy.
+"""
 
 from .user_management import (
     ensure_user_in_organizations,
     update_identity_last_login,
     validate_and_cache_user,
-    token_required
+    token_required,
 )
 from .oauth_handlers import setup_oauth_handlers
 
@@ -13,5 +17,5 @@ __all__ = [
     "update_identity_last_login",
     "validate_and_cache_user",
     "token_required",
-    "setup_oauth_handlers"
+    "setup_oauth_handlers",
 ]

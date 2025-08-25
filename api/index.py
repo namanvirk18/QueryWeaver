@@ -15,7 +15,7 @@ if __name__ == "__main__":
         host="127.0.0.1",
         port=5000,
         reload=debug_mode,
-        log_level="info" if debug_mode else "warning"
+        log_level="info" if debug_mode else "warning",
     )
 # This allows running the app with `uvicorn api.index:app` or directly with `python api/index.py`
 # Ensure the environment variable FASTAPI_DEBUG is set to 'True' for debug mode

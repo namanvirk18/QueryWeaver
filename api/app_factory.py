@@ -43,7 +43,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
 def create_app():
     """Create and configure the FastAPI application."""
-    app = FastAPI(title="QueryWeaver", description="Text2SQL with Graph-Powered Schema Understanding")
+    app = FastAPI(
+        title="QueryWeaver",
+        description=(
+            "Text2SQL with "
+            "Graph-Powered Schema Understanding"
+        ),
+    )
 
     # Get secret key for sessions
     secret_key = os.getenv("FASTAPI_SECRET_KEY")

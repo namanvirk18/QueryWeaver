@@ -1,8 +1,7 @@
 """Database connection routes for the text2sql API."""
 import logging
-from typing import Dict, Any
 
-from fastapi import APIRouter, Request, HTTPException, status
+from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -14,6 +13,11 @@ database_router = APIRouter()
 
 
 class DatabaseConnectionRequest(BaseModel):
+    """Database connection request model.
+
+    Args:
+        BaseModel (_type_): _description_
+    """
     url: str
 
 
@@ -36,7 +40,7 @@ async def connect_database(request: Request, db_request: DatabaseConnectionReque
     try:
         success = False
         result = ""
-        
+
         # Check for PostgreSQL URL
         if url.startswith("postgres://") or url.startswith("postgresql://"):
             try:
@@ -44,8 +48,11 @@ async def connect_database(request: Request, db_request: DatabaseConnectionReque
                 success, result = PostgresLoader.load(request.state.user_id, url)
             except (ValueError, ConnectionError) as e:
                 logging.error("PostgreSQL connection error: %s", str(e))
-                raise HTTPException(status_code=500, detail="Failed to connect to PostgreSQL database")
-        
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to connect to PostgreSQL database",
+                )
+
         # Check for MySQL URL
         elif url.startswith("mysql://"):
             try:
@@ -53,10 +60,18 @@ async def connect_database(request: Request, db_request: DatabaseConnectionReque
                 success, result = MySQLLoader.load(request.state.user_id, url)
             except (ValueError, ConnectionError) as e:
                 logging.error("MySQL connection error: %s", str(e))
-                raise HTTPException(status_code=500, detail="Failed to connect to MySQL database")
-        
+                raise HTTPException(
+                    status_code=500, detail="Failed to connect to MySQL database"
+                )
+
         else:
-            raise HTTPException(status_code=400, detail="Invalid database URL. Supported formats: postgresql:// or mysql://")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid database URL. Supported formats: postgresql:// "
+                    "or mysql://"
+                ),
+            )
 
         if success:
             return JSONResponse(content={
@@ -67,7 +82,7 @@ async def connect_database(request: Request, db_request: DatabaseConnectionReque
         # Don't return detailed error messages to prevent information exposure
         logging.error("Database loader failed: %s", result)
         raise HTTPException(status_code=400, detail="Failed to load database schema")
-        
+
     except (ValueError, TypeError) as e:
         logging.error("Unexpected error in database connection: %s", str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
