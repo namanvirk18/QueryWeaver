@@ -231,8 +231,10 @@ async def validate_user(request: Request) -> Tuple[Optional[Dict[str, Any]], boo
     Includes refresh handling for Google.
     """
     try:
-        #TODO token might be in the URL
+        # token might be in the URL if not in the cookie for API access
         api_token = request.cookies.get("api_token")
+        if not api_token:
+            api_token = request.query_params.get("api_token")
 
         if api_token:
             db_info = await _get_user_info(api_token)
