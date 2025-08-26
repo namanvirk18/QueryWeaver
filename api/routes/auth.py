@@ -57,6 +57,8 @@ async def chat(request: Request) -> HTMLResponse:
         is_authenticated = False
         user_info = None
 
+    print(f"XXXXXXXXXXXXXXXXXX User Info: {user_info}, Authenticated: {is_authenticated}")
+
     return templates.TemplateResponse(
         "chat.j2",
         {
@@ -79,6 +81,8 @@ def _build_callback_url(request: Request, path: str) -> str:
 async def home(request: Request) -> HTMLResponse:
     """Handle the home page, rendering the landing page for unauthenticated users and the chat page for authenticated users."""
     user_info, is_authenticated_flag = await validate_user(request)
+
+    print(f"XXXXXXXXXXXXXXXXXX User Info: {user_info}, is_authenticated_flag: {is_authenticated_flag}")
 
     if is_authenticated_flag or user_info:
         return templates.TemplateResponse(
