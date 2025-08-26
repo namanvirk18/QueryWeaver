@@ -97,9 +97,9 @@ async def list_graphs(request: Request):
     """
     user_id = request.state.user_id
     user_graphs = await db.list_graphs()
-    # Only include graphs that start with user_id + '|', and strip the prefix
-    filtered_graphs = [graph[len(f"{user_id}|"):]
-                       for graph in user_graphs if graph.startswith(f"{user_id}|")]
+    # Only include graphs that start with user_id + '_', and strip the prefix
+    filtered_graphs = [graph[len(f"{user_id}_"):]
+                       for graph in user_graphs if graph.startswith(f"{user_id}_")]
     return JSONResponse(content=filtered_graphs)
 
 
