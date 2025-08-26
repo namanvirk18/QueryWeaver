@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from api.agents import AnalysisAgent, RelevancyAgent, ResponseFormatterAgent
 from api.auth.user_management import token_required
+from api.memory import create_memory_manager
 from api.extensions import db
 from api.graph import find, get_db_description
 from api.loaders.csv_loader import CSVLoader
@@ -280,6 +281,18 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
     if not graph_id:
         raise HTTPException(status_code=400, detail="Invalid graph_id")
 
+    # Get user info from session
+    user_info = request.session.get("user_info")
+    if not user_info:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    
+    user_id = user_info["id"]
+    
+    # Create memory manager for the current user and switch to this database
+    memory_manager = await create_memory_manager(user_id)
+    if memory_manager:
+        await memory_manager.switch_database(graph_id)
+
     graph_id = request.state.user_id + "_" + graph_id
 
     queries_history = chat_data.chat if hasattr(chat_data, 'chat') else None
@@ -525,6 +538,30 @@ What this will do:
         # Log timing summary at the end of processing
         overall_elapsed = time.perf_counter() - overall_start
         logging.info("Query processing pipeline completed - Total time: %.2f seconds", overall_elapsed)
+
+        # Save conversation to memory manager if available
+        if memory_manager:
+            try:
+                # Convert chat history to conversation format for memory manager
+                conversation = []
+                for i, query in enumerate(queries_history):
+                    conversation_entry = {
+                        "question": query,
+                        "answer": result_history[i] if result_history and i < len(result_history) else "",
+                    }
+                    # Add SQL if this was the last query and we generated one
+                    if i == len(queries_history) - 1 and 'answer_an' in locals() and answer_an.get('sql_query'):
+                        conversation_entry["sql"] = answer_an['sql_query']
+                    
+                    conversation.append(conversation_entry)
+                
+                # Save conversation with memory manager (run in background)
+                save_task = asyncio.create_task(memory_manager.save_user_conversation(conversation))
+                # Add error handling callback to prevent silent failures
+                save_task.add_done_callback(lambda t: logging.error(f"Memory save failed: {t.exception()}") if t.exception() else logging.info("Conversation saved to memory manager"))
+                logging.info("Conversation save task started in background")
+            except Exception as e:
+                logging.error(f"Failed to save conversation to memory manager: {e}")
 
     return StreamingResponse(generate(), media_type="application/json")
 

@@ -1,374 +1,177 @@
 """
-QueryWeaver Memory Manager with Cognitive Architecture
+QueryWeaver Memory Manager
 
-This module provides the main interface for managing user memories in QueryWeaver.
-It coordinates episodic and semantic memory systems using Graphiti temporal knowledge graphs.
-Each user gets their own dedicated memory graph via FalkorDB database parameter.
+Clean, focused memory manager that coordinates user memories and uses LLM for summarization.
+Each user gets their own memory graph via Graphiti and FalkorDB.
 """
 
 from typing import List, Dict, Any, Optional
-from api.extensions import db
-from .graphiti_tool import CognitiveMemorySystem
-
-
-class QueryWeaverMemoryManager:
-    """
-    Main memory manager for QueryWeaver that coordinates:
-    - Episodic Memory: Past interactions and lessons learned
-    - Semantic Memory: Facts and knowledge about databases/queries
-    
-    Each user gets their own memory graph using FalkorDB database={user_id}_memory
-    """
-    
-    def __init__(self):
-        """Initialize the memory manager with cognitive memory system."""
-        self.cognitive_memory = CognitiveMemorySystem(db)
-    
-    # ===== EPISODIC MEMORY INTERFACE =====
-    async def save_interaction_memory(self, user_id: str, conversation: List[Dict[str, Any]], 
-                                    database_name: str, what_worked: str = "", 
-                                    what_to_avoid: str = "") -> bool:
-        """
-        Save episodic memory from user interaction.
-        
-        Args:
-            user_id: Unique user identifier
-            conversation: List of user/system exchanges
-            database_name: Name of database being queried
-            what_worked: Analysis of what worked well
-            what_to_avoid: Analysis of what should be avoided
-        """
-        return await self.cognitive_memory.save_episodic_memory(
-            user_id, conversation, database_name, what_worked, what_to_avoid
-        )
-    
-    async def recall_past_interactions(self, user_id: str, query: str, 
-                                     database_name: str) -> Dict[str, str]:
-        """
-        Recall similar past interactions and lessons learned.
-        
-        Returns:
-            Dict with keys: past_interactions, what_worked, what_to_avoid
-        """
-        return await self.cognitive_memory.recall_episodic_memory(
-            user_id, query, database_name
-        )
-    
-    # ===== SEMANTIC MEMORY INTERFACE =====
-    async def save_schema_knowledge(self, user_id: str, database_name: str, 
-                                  schema_facts: List[str], 
-                                  query_patterns: List[str]) -> bool:
-        """
-        Save semantic memory about database schemas and query patterns.
-        
-        Args:
-            user_id: Unique user identifier
-            database_name: Name of database
-            schema_facts: List of facts about the database schema
-            query_patterns: List of common query patterns
-        """
-        return await self.cognitive_memory.save_semantic_memory(
-            user_id, database_name, schema_facts, query_patterns
-        )
-    
-    async def recall_schema_knowledge(self, user_id: str, query: str, 
-                                    database_name: str) -> List[str]:
-        """
-        Recall relevant facts and concepts about the database.
-        
-        Returns:
-            List of relevant schema facts and query patterns
-        """
-        return await self.cognitive_memory.recall_semantic_memory(
-            user_id, query, database_name
-        )
-    
-    # ===== MEMORY MANAGEMENT =====
-    async def initialize_user_memory(self, user_id: str, database_name: str) -> bool:
-        """
-        Initialize memory graph for a new user.
-        Creates user-specific memory database using FalkorDB database parameter.
-        
-        Args:
-            user_id: Unique user identifier
-            database_name: Name of database they're working with
-        """
-        try:
-            # Ensure user node exists in their dedicated memory graph
-            user_node_uuid = await self.cognitive_memory.ensure_user_node(user_id, database_name)
-            return user_node_uuid is not None
-        except Exception as e:
-            print(f"Failed to initialize memory for user {user_id}: {e}")
-            return False
-    
-    async def get_memory_status(self, user_id: str) -> Dict[str, Any]:
-        """
-        Get status of user's memory system.
-        
-        Returns:
-            Dictionary with memory statistics and availability
-        """
-        try:
-            if not self.cognitive_memory.is_available():
-                return {
-                    "available": False,
-                    "error": "Graphiti memory system not available"
-                }
-            
-            # Get user's Graphiti client to check their memory database
-            user_client = self.cognitive_memory._get_user_graphiti_client(user_id)
-            if not user_client:
-                return {
-                    "available": False,
-                    "error": f"Could not create memory database for user {user_id}"
-                }
-            
-            return {
-                "available": True,
-                "user_id": user_id,
-                "database": f"{user_id}_memory",
-                "memory_types": ["episodic", "semantic"],
-                "status": "ready"
-            }
-            
-        except Exception as e:
-            return {
-                "available": False,
-                "error": str(e)
-            }
-    
-    def is_available(self) -> bool:
-        """Check if memory system is available."""
-        return self.cognitive_memory.is_available()
-
-
-# Global memory manager instance
-memory_manager = QueryWeaverMemoryManager()
-
-from typing import List, Dict, Any, Optional
 from datetime import datetime
-import json
-import asyncio
 from fastapi import Request
+import json
 
-from api.extensions import db as falkor_db
-from .graphiti_tool import CognitiveMemorySystem
+# LLM imports for summarization
+from litellm import completion
+
+from api.extensions import db
+from api.config import Config
+from .graphiti_tool import GraphitiManager
 
 
-class QueryWeaverMemoryManager:
+class MemoryManager:
     """
-    Memory manager implementing simplified cognitive architecture for QueryWeaver.
-    Coordinates episodic and semantic memory for intelligent query assistance.
+    Clean memory manager per user that uses LLM for summarization.
+    Delegates actual memory operations to graphiti_tool.py.
     """
     
-    def __init__(self):
-        """Initialize cognitive memory manager."""
-        self.cognitive_memory = CognitiveMemorySystem(falkor_db)
-        self.fallback_storage = {}  # Simple in-memory fallback
+    def __init__(self, user_id: str):
+        """Initialize the memory manager for a specific user (sync part only)."""
+        # Set the graphiti client with FalkorDB connection
+        self.graphiti_manager = GraphitiManager(db)
+        self.graphiti_client = None
+        self.user_id = user_id
+        self.current_database = None
+        self.config = Config()
         
-    # ===== PUBLIC API FUNCTIONS =====
-    
-    async def save_conversation(self, request: Request, conversation: List[Dict[str, Any]], 
-                              database_name: str, what_worked: str = "", 
-                              what_to_avoid: str = "") -> bool:
+    @classmethod
+    async def create(cls, user_id: str):
+        """Create and initialize a memory manager for a specific user."""
+        instance = cls(user_id)
+        await instance._initialize_user_node()
+        return instance
+        
+    async def _initialize_user_node(self):
+        """Initialize user node for this memory manager's user."""
+        try:
+            # Get client for this user
+            self.graphiti_client = self.graphiti_manager._get_user_graphiti_client(self.user_id)
+
+            if self.graphiti_client:
+                # Ensure user node exists
+                await self.graphiti_manager._ensure_user_node(self.graphiti_client, self.user_id)
+                print(f"Initialized memory manager for user {self.user_id}")
+            else:
+                print(f"Failed to get Graphiti client for user {self.user_id}")
+                
+        except Exception as e:
+            print(f"Failed to initialize user node for {self.user_id}: {e}")
+        
+    async def switch_database(self, database_name: str) -> bool:
         """
-        Save complete conversation with cognitive analysis.
+        Switch to a different database context and ensure database node exists.
         
         Args:
-            request: FastAPI request object
-            conversation: List of question/SQL/answer exchanges
-            database_name: Name of database being queried
-            what_worked: What worked well in this interaction
-            what_to_avoid: What should be avoided in future
-        """
-        user_id = self._get_user_id(request)
-        
-        # Ensure user node exists
-        if self.cognitive_memory.is_available():
-            await self.cognitive_memory.ensure_user_node(user_id, database_name)
-        
-        # Save to episodic memory with analysis
-        episodic_success = await self.cognitive_memory.save_episodic_memory(
-            user_id, conversation, database_name, what_worked, what_to_avoid
-        )
-        
-        # Extract and save semantic knowledge
-        await self._extract_and_save_semantic_knowledge(user_id, conversation, database_name)
-        
-        # Always save to fallback as well
-        self._save_to_fallback(user_id, conversation, database_name)
-        
-        return episodic_success or True
-    
-    async def get_relevant_context(self, request: Request, query: str, database_name: str) -> Dict[str, Any]:
-        """
-        Get context from episodic and semantic memory for query processing.
-        
-        Returns:
-            Dict containing:
-            - episodic_memory: Past interactions and lessons learned
-            - semantic_memory: Relevant facts about database/queries
-        """
-        user_id = self._get_user_id(request)
-        
-        # Get episodic memory (past interactions and lessons)
-        episodic_context = {"past_interactions": "", "what_worked": "", "what_to_avoid": ""}
-        if self.cognitive_memory.is_available():
-            episodic_context = await self.cognitive_memory.recall_episodic_memory(
-                user_id, query, database_name
-            )
-        
-        # Get semantic memory (facts and knowledge)
-        semantic_facts = []
-        if self.cognitive_memory.is_available():
-            semantic_facts = await self.cognitive_memory.recall_semantic_memory(user_id, query, database_name)
-        
-        return {
-            "episodic_memory": episodic_context,
-            "semantic_memory": semantic_facts
-        }
-    
-    async def save_schema_knowledge(self, user_id: str, database_name: str, schema_info: Dict[str, Any]) -> bool:
-        """Save database schema information to user's semantic memory."""
-        if not self.cognitive_memory.is_available():
-            return False
-        
-        # Extract schema facts
-        schema_facts = []
-        if 'tables' in schema_info:
-            for table, info in schema_info['tables'].items():
-                schema_facts.append(f"Table {table} exists with columns: {', '.join(info.get('columns', []))}")
-                if 'relationships' in info:
-                    for rel in info['relationships']:
-                        schema_facts.append(f"Table {table} relates to {rel}")
-        
-        # Extract common query patterns
-        query_patterns = [
-            f"Common queries for {database_name} include SELECT, JOIN, and aggregation operations",
-            f"Database {database_name} supports standard SQL syntax",
-        ]
-        
-        return await self.cognitive_memory.save_semantic_memory(
-            user_id, database_name, schema_facts, query_patterns
-        )
-    
-    # ===== LEGACY API FOR BACKWARD COMPATIBILITY =====
-    
-    async def get_relevant_facts(self, request: Request, query: str, database_name: str) -> List[str]:
-        """Legacy function - get relevant facts from episodic and semantic memory."""
-        context = await self.get_relevant_context(request, query, database_name)
-        
-        facts = []
-        
-        # Add episodic insights
-        if context["episodic_memory"]["past_interactions"]:
-            facts.append(f"Past experience: {context['episodic_memory']['past_interactions']}")
-        if context["episodic_memory"]["what_worked"]:
-            facts.append(f"What worked before: {context['episodic_memory']['what_worked']}")
-        
-        # Add semantic facts
-        facts.extend(context["semantic_memory"][:2])  # Top 2 semantic facts
-        
-        return facts[:3]  # Return top 3 for compatibility
-    
-    # ===== HELPER METHODS =====
-    
-    def _get_user_id(self, request: Request) -> str:
-        """Extract user ID from request."""
-        if hasattr(request, 'session') and 'user' in request.session:
-            return request.session['user'].get('id', 'anonymous')
-        
-        client_ip = request.client.host if request.client else 'unknown'
-        return f"user_{client_ip}"
-    
-    async def _extract_and_save_semantic_knowledge(self, user_id: str, conversation: List[Dict[str, Any]], 
-                                                 database_name: str):
-        """Extract semantic knowledge from successful conversations."""
-        if not self.cognitive_memory.is_available():
-            return
-        
-        schema_facts = []
-        query_patterns = []
-        
-        for exchange in conversation:
-            sql = exchange.get('sql', '')
-            if sql and not sql.lower().startswith('error'):
-                # Extract table names and patterns
-                if 'FROM ' in sql.upper():
-                    tables = self._extract_tables_from_sql(sql)
-                    for table in tables:
-                        schema_facts.append(f"Table {table} is queryable in {database_name}")
-                
-                # Extract query patterns
-                if 'JOIN' in sql.upper():
-                    query_patterns.append("JOIN operations are common for this database")
-                if 'GROUP BY' in sql.upper():
-                    query_patterns.append("Aggregation queries with GROUP BY are supported")
-                if 'WHERE' in sql.upper():
-                    query_patterns.append("Filtering with WHERE clauses is frequently used")
-        
-        if schema_facts or query_patterns:
-            await self.cognitive_memory.save_semantic_memory(
-                user_id, database_name, schema_facts, query_patterns
-            )
-    
-    def _extract_tables_from_sql(self, sql: str) -> List[str]:
-        """Simple extraction of table names from SQL."""
-        tables = []
-        try:
-            sql_upper = sql.upper()
-            # Simple regex-like extraction for FROM and JOIN clauses
-            import re
-            from_pattern = r'FROM\s+(\w+)'
-            join_pattern = r'JOIN\s+(\w+)'
+            database_name: The database name to switch to
             
-            tables.extend(re.findall(from_pattern, sql_upper))
-            tables.extend(re.findall(join_pattern, sql_upper))
-        except:
-            pass
-        
-        return list(set(tables))  # Remove duplicates
+        Returns:
+            bool: True if switch was successful
+        """
+        try:
+            self.current_database = database_name
+
+            # Ensure database node exists when switching to this database
+            await self.graphiti_manager._ensure_database_node(self.graphiti_client, database_name, self.user_id)
+
+        except Exception as e:
+            print(f"Failed to switch to database {database_name}: {e}")
+            return False
     
-    def _save_to_fallback(self, user_id: str, conversation: List[Dict[str, Any]], database_name: str):
-        """Save to simple fallback storage."""
-        if user_id not in self.fallback_storage:
-            self.fallback_storage[user_id] = {}
+    async def summarize_conversation(self, conversation: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Use LLM to summarize the conversation and extract insights oriented to current database.
         
-        if database_name not in self.fallback_storage[user_id]:
-            self.fallback_storage[user_id][database_name] = []
+        Args:
+            conversation: List of user/system exchanges
+            
+        Returns:
+            Dict with 'database_summary' and 'personal_memory' keys
+        """
+        # Format conversation for summarization
+        conv_text = ""
+        for exchange in conversation:
+            conv_text += f"User: {exchange.get('question', '')}\n"
+            if exchange.get('sql'):
+                conv_text += f"SQL: {exchange['sql']}\n"
+            if exchange.get('answer'):
+                conv_text += f"Assistant: {exchange['answer']}\n"
+            conv_text += "\n"
         
-        entry = {
-            'timestamp': datetime.now().isoformat(),
-            'conversation': conversation
-        }
+        prompt = f"""
+                Analyze this QueryWeaver conversation between user "{self.user_id}" and database "{self.current_database}".
+                Your task is to extract two complementary types of memory:
+
+                1. Database-Specific Summary: What the user accomplished and their preferences with this specific database.
+                2. Personal Memory: General information about the user (name, preferences, personal details) that is not specific to this database.
+
+                Conversation:
+                {conv_text}
+
+                Format your response as JSON:
+                {{
+                    "database_summary": "Summarize in natural language what the user was trying to accomplish with this database, highlighting the approaches, techniques, queries, or SQL patterns that worked well, noting errors or problematic patterns to avoid, listing the most important or effective queries executed, and sharing key learnings or insights about the database’s structure, data, and optimal usage patterns.",
+                    "personal_memory": "Summarize any personal information about the user, including their name if mentioned, their general preferences and working style, their SQL or database expertise level, recurring query patterns or tendencies across all databases, and any other personal details that are not specific to a particular database, making sure not to include any database-specific memories."
+                }}
+
+                Instructions:
+                - Only include fields that have actual information from the conversation.
+                - Use empty strings for fields with no information.
+                - Do not invent any information that is not present in the conversation.
+                """
+
         
-        self.fallback_storage[user_id][database_name].append(entry)
+        try:
+            response = completion(
+                model=self.config.COMPLETION_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1
+            )
+            
+            # Parse JSON response
+            content = response.choices[0].message.content
+            if content.startswith("```json"):
+                content = content.replace("```json", "").replace("```", "").strip()
+            
+            result = json.loads(content)
+            return {
+                "database_summary": result.get("database_summary", ""),
+                "personal_memory": result.get("personal_memory", "")
+            }
+            
+        except Exception as e:
+            print(f"Error in LLM summarization: {e}")
+            return {
+                "database_summary": "",
+                "personal_memory": ""
+            }
+    
+    async def save_user_conversation(self, conversation: List[Dict[str, Any]]) -> bool:
+        """
+        Save a conversation for this user with LLM-generated summary and insights.
         
-        # Keep only last 10 conversations per user/database
-        if len(self.fallback_storage[user_id][database_name]) > 10:
-            self.fallback_storage[user_id][database_name] = \
-                self.fallback_storage[user_id][database_name][-10:]
+        Args:
+            conversation: List of exchanges
+            
+        Returns:
+            bool: True if saved successfully
+        """
+        
+        # Use LLM to analyze and summarize the conversation with current database context
+        analysis = await self.summarize_conversation(conversation)
+        
+        # Extract summaries
+        database_summary = analysis.get("database_summary", "")
+        personal_memory = analysis.get("personal_memory", "")
+        
+        # Save to Graphiti with pre-configured client
+        return await self.graphiti_manager.save_summarized_conversation(
+            self.graphiti_client,
+            self.user_id, 
+            self.current_database,
+            database_summary,
+            personal_memory
+        )
 
-
-# Global instance
-memory_manager = QueryWeaverMemoryManager()
-
-
-# Public API functions
-async def save_conversation(request: Request, conversation: List[Dict[str, Any]], 
-                          database_name: str, what_worked: str = "", 
-                          what_to_avoid: str = "") -> bool:
-    """Save conversation with episodic analysis."""
-    return await memory_manager.save_conversation(
-        request, conversation, database_name, what_worked, what_to_avoid
-    )
-
-
-async def get_relevant_facts(request: Request, query: str, database_name: str) -> List[str]:
-    """Get relevant facts for query from episodic and semantic memory."""
-    return await memory_manager.get_relevant_facts(request, query, database_name)
-
-
-async def get_memory_context(request: Request, query: str, database_name: str) -> Dict[str, Any]:
-    """Get context from episodic and semantic memory."""
-    return await memory_manager.get_relevant_context(request, query, database_name)
+# Factory function to create user-specific memory managers
+async def create_memory_manager(user_id: str) -> MemoryManager:
+    """Get a memory manager instance for a specific user."""
+    return await MemoryManager.create(user_id)

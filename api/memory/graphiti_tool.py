@@ -1,252 +1,199 @@
 """
 Graphiti integration for QueryWeaver memory component.
-Implements cognitive architecture with two types of memory:
-- Episodic Memory: Past interactions and experiences 
-- Semantic Memory: Facts and grounded concepts
+Saves summarized conversations with user and database nodes.
 """
 
-from typing import List, Dict, Any, Optional, Tuple
+import os
+from typing import Dict, Any, Optional
 from datetime import datetime
-import json
-import asyncio
-from fastapi import Request
 
-# Import Graphiti components (will be installed via Pipfile)
-try:
-    from graphiti_core.driver.falkordb_driver import FalkorDriver
-    from graphiti_core import Graphiti
-    from graphiti_core.nodes import EpisodeType
-    from graphiti_core.edges import EntityEdge
-    from graphiti_core.utils.bulk_utils import RawEpisode
-    GRAPHITI_AVAILABLE = True
-except ImportError:
-    GRAPHITI_AVAILABLE = False
+# Import Azure OpenAI components
+from openai import AsyncAzureOpenAI
+
+# Import Graphiti components
+from graphiti_core.driver.falkordb_driver import FalkorDriver
+from graphiti_core import Graphiti
+from graphiti_core.nodes import EpisodeType
+from graphiti_core.llm_client import LLMConfig, OpenAIClient
+from graphiti_core.embedder import OpenAIEmbedder, OpenAIEmbedderConfig
+from graphiti_core.cross_encoder import OpenAIRerankerClient
 
 
-class CognitiveMemorySystem:
+class AzureOpenAIConfig:
+    """Configuration for Azure OpenAI integration."""
+    
+    def __init__(self):
+        # Set the model name as requested
+        os.environ["MODEL_NAME"] = "gpt-4.1"
+        
+        self.api_key = os.getenv('AZURE_API_KEY')
+        self.endpoint = os.getenv('AZURE_API_BASE') 
+        self.api_version = os.getenv('AZURE_API_VERSION', '2024-02-01')
+        self.model_choice = "gpt-4.1"  # Use the model name directly
+        self.embedding_model = "text-embedding-ada-002"  # Use model name, not deployment
+        self.small_model = os.getenv('AZURE_SMALL_MODEL', 'gpt-4o-mini')
+        
+        # Use model names directly instead of deployment names
+        self.llm_deployment = self.model_choice
+        self.small_model_deployment = self.small_model
+        self.embedding_deployment = self.embedding_model
+        
+        # Embedding endpoint (can be same or different from main endpoint)
+        self.embedding_endpoint = os.getenv('AZURE_EMBEDDING_ENDPOINT', self.endpoint)
+
+
+def get_azure_openai_clients():
+    """Configure and return Azure OpenAI clients for Graphiti."""
+    config = AzureOpenAIConfig()
+    
+    # Validate required configuration
+    if not config.endpoint:
+        raise ValueError("AZURE_API_BASE environment variable is required")
+    if not config.api_key:
+        raise ValueError("AZURE_API_KEY environment variable is required")
+    
+    # Create separate Azure OpenAI clients for different services
+    llm_client_azure = AsyncAzureOpenAI(
+        api_key=config.api_key,
+        api_version=config.api_version,
+        azure_endpoint=config.endpoint,
+    )
+
+    embedding_client_azure = AsyncAzureOpenAI(
+        api_key=config.api_key,
+        api_version=config.api_version,
+        azure_endpoint=config.embedding_endpoint,
+    )
+
+    return llm_client_azure, embedding_client_azure, config
+
+
+def create_graphiti_client(falkor_driver: FalkorDriver) -> Graphiti:
+    """Create a Graphiti client configured with Azure OpenAI."""
+    # Get Azure OpenAI clients and config
+    llm_client_azure, embedding_client_azure, config = get_azure_openai_clients()
+
+    # Create LLM Config with Azure deployment names
+    azure_llm_config = LLMConfig(
+        small_model=config.small_model_deployment,
+        model=config.llm_deployment,
+    )
+
+    # Initialize Graphiti with Azure OpenAI clients
+    return Graphiti(
+        graph_driver=falkor_driver,
+        llm_client=OpenAIClient(config=azure_llm_config, client=llm_client_azure),
+        embedder=OpenAIEmbedder(
+            config=OpenAIEmbedderConfig(embedding_model=config.embedding_deployment),
+            client=embedding_client_azure,
+        ),
+        cross_encoder=OpenAIRerankerClient(
+            config=LLMConfig(
+                model=azure_llm_config.small_model  # Use small model for reranking
+            ),
+            client=llm_client_azure,
+        ),
+    )
+
+
+class GraphitiManager:
     """
-    Cognitive memory system implementing two types of memory:
-    1. Episodic Memory - Past interactions and what worked/didn't work
-    2. Semantic Memory - Facts and knowledge about databases/queries
+    Graphiti manager for saving summarized conversations with user and database nodes.
     """
     
     def __init__(self, falkor_db):
-        """Initialize cognitive memory system with FalkorDB."""
+        """Initialize Graphiti manager with FalkorDB."""
         self.falkor_db = falkor_db
-        self.user_clients = {}  # Cache for user-specific Graphiti clients
     
     def _get_user_graphiti_client(self, user_id: str):
-        """Get or create Graphiti client for specific user with dedicated database."""
-        if not GRAPHITI_AVAILABLE:
-            return None
-            
-        # Check if we already have a client for this user
-        if user_id in self.user_clients:
-            return self.user_clients[user_id]
-            
+        """Get Graphiti client for specific user with dedicated database and Azure OpenAI."""
         try:
             # Create FalkorDB driver with user-specific database
             user_memory_db = f"{user_id}_memory"
-            falkor_driver = FalkorDriver(self.falkor_db, database=user_memory_db)
+            falkor_driver = FalkorDriver(falkor_db=self.falkor_db, database=user_memory_db)
             
-            # Create Graphiti client for this user's memory database
-            user_graphiti_client = Graphiti(falkor_driver)
+            # Create Graphiti client with Azure OpenAI configuration
+            user_graphiti_client = create_graphiti_client(falkor_driver)
             
-            # Cache the client for future use
-            self.user_clients[user_id] = user_graphiti_client
-            
-            print(f"Created Graphiti client for user {user_id} with database: {user_memory_db}")
+            print(f"Created Azure OpenAI-configured Graphiti client for user {user_id} with database: {user_memory_db}")
             return user_graphiti_client
             
         except Exception as e:
-            print(f"Failed to create user-specific Graphiti client for {user_id}: {e}")
+            print(f"Failed to create Azure OpenAI-configured Graphiti client for {user_id}: {e}")
             return None
 
-    # ===== EPISODIC MEMORY =====
-    async def save_episodic_memory(self, user_id: str, conversation: List[Dict[str, Any]], 
-                                 database_name: str, what_worked: str = "", 
-                                 what_to_avoid: str = "") -> bool:
-        """Save episodic memory - past interactions with analysis of what worked."""
-        user_graphiti_client = self._get_user_graphiti_client(user_id)
-        if not user_graphiti_client:
-            return False
+    async def save_summarized_conversation(self, graphiti_client, user_id: str, database_name: str, 
+                                         database_summary: str, personal_memory: str) -> bool:
+        """
+        Save summarized conversation to Graphiti with user and database nodes.
+        
+        Args:
+            graphiti_client: Pre-configured Graphiti client from memory manager
+            user_id: User identifier
+            database_name: Database/graph name
+            database_summary: LLM-generated database-specific summary
+            personal_memory: LLM-generated personal memory about the user
+            
+        Returns:
+            bool: True if saved successfully
+        """
             
         try:
-            # Format episode with experience analysis
-            episode_content = self._format_episodic_memory(
-                conversation, database_name, what_worked, what_to_avoid
-            )
+            # Save database-specific summary
+            if database_summary:
+                await graphiti_client.add_episode(
+                    name=f"Database_Summary_{user_id}_{database_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    episode_body=f"User: {user_id}\nDatabase: {database_name}\nConversation: {database_summary}",
+                    source=EpisodeType.message,
+                    reference_time=datetime.now(),
+                    source_description=f"User: {user_id} conversation with the Database: {database_name}"
+                )
             
-            await user_graphiti_client.add_episode(
-                name=f"QueryWeaver_Episodic_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                episode_body=episode_content,
-                source=EpisodeType.message,
-                reference_time=datetime.now(),
-                source_description=f"QueryWeaver episodic memory for {database_name}"
-            )
+            # Save personal memory
+            if personal_memory:
+                await graphiti_client.add_episode(
+                    name=f"Personal_Memory_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    episode_body=f"User: {user_id}\nPersonal Memory: {personal_memory}",
+                    source=EpisodeType.message,
+                    reference_time=datetime.now(),
+                    source_description=f"Personal memory for user {user_id}"
+                )
             
             return True
             
         except Exception as e:
-            print(f"Error saving episodic memory for user {user_id}: {e}")
+            print(f"Error saving summarized conversation for user {user_id}: {e}")
             return False
     
-    async def recall_episodic_memory(self, user_id: str, query: str, database_name: str) -> Dict[str, str]:
-        """Recall similar past interactions and lessons learned."""
-        user_graphiti_client = self._get_user_graphiti_client(user_id)
-        if not user_graphiti_client:
-            return {"past_interactions": "", "what_worked": "", "what_to_avoid": ""}
-            
+    async def _ensure_user_node(self, graphiti_client, user_id: str) -> Optional[str]:
+        """Ensure user node exists in the memory graph."""
         try:
-            # Get user node for centered search in user's own graph
-            user_nodes = await user_graphiti_client.get_nodes_by_query(user_id)
-            center_node_uuid = user_nodes[0].uuid if user_nodes else None
-            
-            # Search for similar past episodes in user's memory graph
-            edge_results = await user_graphiti_client.search(
-                query=f"QueryWeaver episodic {user_id} {database_name} {query}",
-                center_node_uuid=center_node_uuid,
-                num_results=3
-            )
-            
-            if edge_results:
-                facts = self._edges_to_facts_string(edge_results)
-                return self._parse_episodic_facts(facts)
-            
-            return {"past_interactions": "", "what_worked": "", "what_to_avoid": ""}
-            
-        except Exception as e:
-            print(f"Error recalling episodic memory for user {user_id}: {e}")
-            return {"past_interactions": "", "what_worked": "", "what_to_avoid": ""}
-    
-    # ===== SEMANTIC MEMORY =====
-    async def save_semantic_memory(self, user_id: str, database_name: str, schema_facts: List[str], 
-                                 query_patterns: List[str]) -> bool:
-        """Save semantic memory - facts about database schemas and query patterns."""
-        user_graphiti_client = self._get_user_graphiti_client(user_id)
-        if not user_graphiti_client:
-            return False
-            
-        try:
-            # Create semantic knowledge episodes in user's memory graph
-            facts_content = f"Database: {database_name}\n"
-            facts_content += "Schema Facts:\n" + "\n".join([f"- {fact}" for fact in schema_facts])
-            facts_content += "\n\nQuery Patterns:\n" + "\n".join([f"- {pattern}" for pattern in query_patterns])
-            
-            await user_graphiti_client.add_episode(
-                name=f"QueryWeaver_Semantic_{user_id}_{database_name}_{datetime.now().strftime('%Y%m%d')}",
-                episode_body=facts_content,
+            await graphiti_client.add_episode(
+                name=f'User_Node_{user_id}',
+                episode_body=f'User {user_id} is using QueryWeaver',
                 source=EpisodeType.text,
                 reference_time=datetime.now(),
-                source_description=f"QueryWeaver semantic knowledge for {database_name}"
+                source_description='User node creation'
             )
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error saving semantic memory for user {user_id}: {e}")
-            return False
-    
-    async def recall_semantic_memory(self, user_id: str, query: str, database_name: str) -> List[str]:
-        """Recall relevant facts and concepts about the database and query patterns."""
-        user_graphiti_client = self._get_user_graphiti_client(user_id)
-        if not user_graphiti_client:
-            return []
-            
-        try:
-            # Search for semantic knowledge in user's memory graph
-            edge_results = await user_graphiti_client.search(
-                query=f"QueryWeaver semantic {database_name} {query}",
-                center_node_uuid=None,  # Global search within user's graph
-                num_results=5
-            )
-            
-            if edge_results:
-                facts_string = self._edges_to_facts_string(edge_results)
-                return [fact.strip('- ') for fact in facts_string.split('\n') if fact.strip()]
-            
-            return []
-            
-        except Exception as e:
-            print(f"Error recalling semantic memory for user {user_id}: {e}")
-            return []
-    
-    # ===== HELPER METHODS =====
-    def _format_episodic_memory(self, conversation: List[Dict[str, Any]], database_name: str,
-                               what_worked: str, what_to_avoid: str) -> str:
-        """Format episodic memory with experience analysis."""
-        content = f"Database: {database_name}\n\n"
-        
-        # Format conversation
-        content += "Conversation:\n"
-        for exchange in conversation:
-            content += f"User: {exchange.get('question', '')}\n"
-            if exchange.get('sql'):
-                content += f"SQL: {exchange['sql']}\n"
-            if exchange.get('answer'):
-                content += f"QueryWeaver: {exchange['answer']}\n"
-            content += "\n"
-        
-        # Add experience analysis
-        if what_worked:
-            content += f"What Worked Well: {what_worked}\n"
-        if what_to_avoid:
-            content += f"What to Avoid: {what_to_avoid}\n"
-        
-        return content
-    
-    def _parse_episodic_facts(self, facts_string: str) -> Dict[str, str]:
-        """Parse episodic facts to extract structured learning."""
-        lines = facts_string.split('\n')
-        result = {"past_interactions": "", "what_worked": "", "what_to_avoid": ""}
-        
-        current_section = "past_interactions"
-        for line in lines:
-            line = line.strip('- ').strip()
-            if not line:
-                continue
-            if "What Worked Well:" in line:
-                current_section = "what_worked"
-                result[current_section] = line.replace("What Worked Well:", "").strip()
-            elif "What to Avoid:" in line:
-                current_section = "what_to_avoid"
-                result[current_section] = line.replace("What to Avoid:", "").strip()
-            else:
-                if result[current_section]:
-                    result[current_section] += " " + line
-                else:
-                    result[current_section] = line
-        
-        return result
-    
-    def _edges_to_facts_string(self, entities: List[EntityEdge]) -> str:
-        """Convert EntityEdge results to facts string."""
-        if not entities:
-            return ""
-        return '\n'.join([f"- {edge.fact}" for edge in entities])
-    
-    async def ensure_user_node(self, user_id: str, database_name: str) -> Optional[str]:
-        """Ensure user node exists in user's memory graph."""
-        user_graphiti_client = self._get_user_graphiti_client(user_id)
-        if not user_graphiti_client:
-            return None
-            
-        try:
-            await user_graphiti_client.add_episode(
-                name='User Initialization',
-                episode_body=f'{user_id} is using QueryWeaver to query {database_name} database',
-                source=EpisodeType.text,
-                reference_time=datetime.now(),
-                source_description='QueryWeaver User Management'
-            )
-            
-            user_nodes = await user_graphiti_client.get_nodes_by_query(user_id)
-            return user_nodes[0].uuid if user_nodes else None
+            return user_id
             
         except Exception as e:
             print(f"Error creating user node for {user_id}: {e}")
             return None
-    
-    def is_available(self) -> bool:
-        """Check if Graphiti is available and working."""
-        return GRAPHITI_AVAILABLE and hasattr(self, 'falkor_driver')
+
+    async def _ensure_database_node(self, graphiti_client, database_name: str, user_id: str) -> Optional[str]:
+        """Ensure database node exists in the memory graph."""
+        try:
+            await graphiti_client.add_episode(
+                name=f'Database_Node_{database_name}',
+                episode_body=f'User {user_id} has database {database_name} available for querying',
+                source=EpisodeType.text,
+                reference_time=datetime.now(),
+                source_description='Database node creation'
+            )
+            return database_name
+            
+        except Exception as e:
+            print(f"Error creating database node for {database_name}: {e}")
+            return None
+
