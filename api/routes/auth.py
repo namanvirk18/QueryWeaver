@@ -166,7 +166,7 @@ async def google_authorized(request: Request) -> RedirectResponse:
                 # call the registered handler (await if async)
                 await handler('google', user_data, api_token)
 
-                redirect = RedirectResponse(url="/", status_code=302)
+                redirect = RedirectResponse(url="/chat", status_code=302)
                 redirect.set_cookie(
                     key="api_token",
                     value=api_token,
@@ -249,7 +249,7 @@ async def github_authorized(request: Request) -> RedirectResponse:
                 # call the registered handler (await if async)
                 await handler('github', user_data, api_token)
 
-                redirect = RedirectResponse(url="/", status_code=302)
+                redirect = RedirectResponse(url="/chat", status_code=302)
                 redirect.set_cookie(
                     key="api_token",
                     value=api_token,

@@ -63,10 +63,10 @@ clean: ## Clean up test artifacts
 	find . -name "*.pyo" -delete
 
 run-dev: build-dev ## Run development server
-	pipenv run uvicorn api.index:app --host 127.0.0.1 --port 5000 --reload
+	pipenv run uvicorn api.index:app --host 127.0.0.1 --port $${PORT:-5000} --reload
 
 run-prod: build-prod ## Run production server
-	pipenv run uvicorn api.index:app --host 127.0.0.1 --port 5000
+	pipenv run uvicorn api.index:app --host 0.0.0.0 --port $${PORT:-5000}
 
 docker-falkordb: ## Start FalkorDB in Docker for testing
 	docker run -d --name falkordb-test -p 6379:6379 falkordb/falkordb:latest

@@ -2,6 +2,7 @@
 
 import base64
 import logging
+from math import log
 import os
 import secrets
 from functools import wraps
@@ -35,14 +36,15 @@ async def _get_user_info(api_token: str) -> Optional[Dict[str, Any]]:
         })
 
         if result.result_set:
-            token_valid = result.result_set[0][3]
+            single_result = result.result_set[0]
+            token_valid = single_result[3]
 
             # TODO delete invalid token from DB
             if token_valid:
                 return {
-                    "email": result.result_set[0][0],
-                    "name": result.result_set[0][1],
-                    "picture": result.result_set[0][2]
+                    "email": single_result[0],
+                    "name": single_result[1],
+                    "picture": single_result[2]
                 }
 
         return None

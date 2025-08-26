@@ -3,7 +3,7 @@
 import os
 
 from falkordb.asyncio import FalkorDB
-from redis.asyncio import ConnectionPool
+from redis.asyncio import BlockingConnectionPool
 
 # Connect to FalkorDB
 url = os.getenv("FALKORDB_URL", None)
@@ -16,7 +16,7 @@ else:
     # Ensure the URL is properly encoded as string and handle potential encoding issues
     try:
         # Create connection pool with explicit encoding settings
-        pool = ConnectionPool.from_url(
+        pool = BlockingConnectionPool.from_url(
             url,
             decode_responses=True
         )
