@@ -80,8 +80,6 @@ async def home(request: Request) -> HTMLResponse:
     """Handle the home page, rendering the landing page for unauthenticated users and the chat page for authenticated users."""
     user_info, is_authenticated_flag = await validate_user(request)
 
-    print(f"XXXXXXXXXXXXXXXXXX User Info: {user_info}, is_authenticated_flag: {is_authenticated_flag}")
-
     if is_authenticated_flag or user_info:
         return templates.TemplateResponse(
             "chat.j2",
