@@ -24,15 +24,22 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Create and start virtual environment
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-      
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-        
-      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Install dependencies using make
+        run: make install
+
+      - name: Build production assets
+        run: make build-prod
+
+      - name: Generate requirements.txt for production
+        run: pipenv requirements > requirements.txt
 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
@@ -41,6 +48,14 @@ jobs:
           path: |
             .
             !venv/
+            !node_modules/
+            !.git/
+            !test-results/
+            !playwright-report/
+            !tests/e2e/screenshots/
+            !__pycache__/
+            !Pipfile
+            !Pipfile.lock
 
   deploy:
     runs-on: ubuntu-latest
@@ -54,6 +69,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: python-app
+
+      - name: Set up Python version
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       
       - name: Login to Azure
         uses: azure/login@v2
@@ -68,4 +88,4 @@ jobs:
         with:
           app-name: 'queryweaver'
           slot-name: 'Production'
-          
+          startup-command: 'python -m uvicorn api.index:app --host 0.0.0.0 --port $PORT'
