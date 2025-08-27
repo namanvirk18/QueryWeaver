@@ -14,7 +14,7 @@ class CSVLoader(BaseLoader):
     """CSV data loader for processing CSV files and loading them into graph database."""
 
     @staticmethod
-    def load(graph_id: str, data) -> Tuple[bool, str]:
+    async def load(graph_id: str, data) -> Tuple[bool, str]:
         """
         Load the data dictionary CSV file into the graph database.
 
@@ -192,10 +192,10 @@ deep nesting to minimize complexity and optimize performance."""
                                             "source_column": key,
                                             "target_column": key,
                                             "note": "many-many",
-                                        }
-                                    )
+                                    }
+                                )
 
-            load_to_graph(graph_id, tables, relationships, db_name=db_name)
+            await load_to_graph(graph_id, tables, relationships, db_name=db_name)
             return True, "Data dictionary loaded successfully into graph"
 
         except Exception as e:

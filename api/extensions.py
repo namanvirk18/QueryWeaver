@@ -2,7 +2,8 @@
 
 import os
 
-from falkordb import FalkorDB
+from falkordb.asyncio import FalkorDB
+from redis.asyncio import BlockingConnectionPool
 
 # Connect to FalkorDB
 url = os.getenv("FALKORDB_URL", None)
@@ -12,4 +13,13 @@ if url is None:
     except Exception as e:
         raise ConnectionError(f"Failed to connect to FalkorDB: {e}") from e
 else:
-    db = FalkorDB.from_url(os.getenv("FALKORDB_URL"))
+    # Ensure the URL is properly encoded as string and handle potential encoding issues
+    try:
+        # Create connection pool with explicit encoding settings
+        pool = BlockingConnectionPool.from_url(
+            url,
+            decode_responses=True
+        )
+        db = FalkorDB(connection_pool=pool)
+    except Exception as e:
+        raise ConnectionError(f"Failed to connect to FalkorDB with URL: {e}") from e

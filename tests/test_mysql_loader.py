@@ -1,5 +1,6 @@
 """Tests for MySQL loader functionality."""
 
+import asyncio
 import datetime
 import decimal
 from unittest.mock import patch, MagicMock
@@ -110,7 +111,9 @@ class TestMySQLLoader:
         # Mock connection failure
         mock_connect.side_effect = Exception("Connection failed")
 
-        success, message = MySQLLoader.load("test_prefix", "mysql://user:pass@host:3306/db")
+        success, message = asyncio.run(
+            MySQLLoader.load("test_prefix", "mysql://user:pass@host:3306/db")
+        )
 
         assert success is False
         assert "Error loading MySQL schema" in message
@@ -132,9 +135,9 @@ class TestMySQLLoader:
         with patch.object(MySQLLoader, 'extract_tables_info',
                           return_value={'users': {'description': 'User table'}}):
             with patch.object(MySQLLoader, 'extract_relationships', return_value={}):
-                success, message = MySQLLoader.load(
+                success, message = asyncio.run(MySQLLoader.load(
                     "test_prefix", "mysql://user:pass@localhost:3306/testdb"
-                )
+                ))
 
         assert success is True
         assert "MySQL schema loaded successfully" in message

@@ -3,14 +3,14 @@
 {% block title %}QueryWeaver — Natural language to SQL{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', path='css/landing.css') }}">
+<link rel="stylesheet" href="/static/css/landing.css">
 {% endblock %}
 
 {% block content %}
 <!-- Top header with logo -->
 <header class="site-header" role="banner">
   <div class="site-header-inner">
-      <img src="{{ url_for('static', path='icons/queryweaver.webp') }}" alt="QueryWeaver" />
+    <img src="/static/icons/queryweaver.webp" alt="QueryWeaver" />
   </div>
 </header>
 
@@ -78,36 +78,36 @@
         let typingTimer = null;
         const typingSpeed = 15; // ms per character
 
-        function escapeHtml(s){
-          return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        function escapeHtml(s) {
+          return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
         // very small client-side SQL highlighter (runs after typing completes)
-        function highlightSQL(sql){
-          if(!sql) return '';
+        function highlightSQL(sql) {
+          if (!sql) return '';
           // escape first
           let out = escapeHtml(sql);
           // strings (single quotes)
           out = out.replace(/('[^']*')/g, '<span class="sql-string">$1</span>');
           // keywords
           out = out.replace(/\b(SELECT|FROM|JOIN|ON|WHERE|AND|OR|GROUP|BY|ORDER|LIMIT|AS|IN|IS|NULL|INNER|LEFT|RIGHT|OUTER)\b/gi,
-            function(m){ return '<span class="sql-keyword">'+m+'</span>'; });
+            function (m) { return '<span class="sql-keyword">' + m + '</span>'; });
           // aggregate/functions
-          out = out.replace(/\b(COUNT|SUM|AVG|MIN|MAX)\b/gi, function(m){ return '<span class="sql-func">'+m+'</span>'; });
+          out = out.replace(/\b(COUNT|SUM|AVG|MIN|MAX)\b/gi, function (m) { return '<span class="sql-func">' + m + '</span>'; });
           // numbers
           out = out.replace(/\b(\d+\.?\d*)\b/g, '<span class="sql-number">$1</span>');
           return out;
         }
 
-        function renderFull(i){
+        function renderFull(i) {
           const ex = examples[i % examples.length];
-          if(qEl) qEl.textContent = ex.q;
-          if(sEl) {
+          if (qEl) qEl.textContent = ex.q;
+          if (sEl) {
             sEl.classList.remove('typing');
             // show highlighted SQL after typing completes
             sEl.innerHTML = highlightSQL(ex.sql);
           }
-          if(successEl) successEl.style.display = 'flex';
+          if (successEl) successEl.style.display = 'flex';
         }
 
         function typeSql(text) {
@@ -125,7 +125,7 @@
           typingTimer = setInterval(() => {
             pos += 1;
             // progressively render highlighted HTML for the substring so colors appear while typing
-            if(sEl) sEl.innerHTML = highlightSQL(text.slice(0, pos));
+            if (sEl) sEl.innerHTML = highlightSQL(text.slice(0, pos));
             if (pos >= text.length) {
               clearInterval(typingTimer);
               typingTimer = null;
@@ -154,7 +154,6 @@
       })();
     </script>
 </div>
-</aside>
 
 <!-- Feature boxes -->
 <section class="features-row" aria-label="Key features">
@@ -207,5 +206,4 @@
   </div>
 </section>
 
-</div>
 {% endblock %}

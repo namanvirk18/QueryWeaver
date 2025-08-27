@@ -107,7 +107,7 @@ if success:
     graph = db.select_graph(graph_id)
 
     # Query for all tables
-    result = graph.query("MATCH (t:Table) RETURN t.name")
+    result = await graph.query("MATCH (t:Table) RETURN t.name")
     print("Tables:", [record[0] for record in result.result_set])
 {% endcapture %}
 

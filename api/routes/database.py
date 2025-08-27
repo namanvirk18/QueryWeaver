@@ -45,7 +45,7 @@ async def connect_database(request: Request, db_request: DatabaseConnectionReque
         if url.startswith("postgres://") or url.startswith("postgresql://"):
             try:
                 # Attempt to connect/load using the PostgreSQL loader
-                success, result = PostgresLoader.load(request.state.user_id, url)
+                success, result = await PostgresLoader.load(request.state.user_id, url)
             except (ValueError, ConnectionError) as e:
                 logging.error("PostgreSQL connection error: %s", str(e))
                 raise HTTPException(
@@ -57,7 +57,7 @@ async def connect_database(request: Request, db_request: DatabaseConnectionReque
         elif url.startswith("mysql://"):
             try:
                 # Attempt to connect/load using the MySQL loader
-                success, result = MySQLLoader.load(request.state.user_id, url)
+                success, result = await MySQLLoader.load(request.state.user_id, url)
             except (ValueError, ConnectionError) as e:
                 logging.error("MySQL connection error: %s", str(e))
                 raise HTTPException(

@@ -5,6 +5,7 @@ Test script for PostgreSQL Loader
 This script provides basic tests for the PostgreSQL loader functionality.
 """
 
+import asyncio
 import unittest
 from unittest.mock import Mock, patch
 
@@ -40,7 +41,9 @@ class TestPostgreSQLLoader(unittest.TestCase):
         mock_load_to_graph.return_value = None
 
         # Test the loader
-        success, message = PostgresLoader.load(self.test_graph_id, self.test_connection_url)
+        success, message = asyncio.run(
+            PostgresLoader.load(self.test_graph_id, self.test_connection_url)
+        )
 
         # Assertions
         self.assertTrue(success)
@@ -55,7 +58,9 @@ class TestPostgreSQLLoader(unittest.TestCase):
         mock_connect.side_effect = Exception("Connection failed")
 
         # Test the loader
-        success, message = PostgresLoader.load(self.test_graph_id, self.test_connection_url)
+        success, message = asyncio.run(
+            PostgresLoader.load(self.test_graph_id, self.test_connection_url)
+        )
 
         # Assertions
         self.assertFalse(success)
