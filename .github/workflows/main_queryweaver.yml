@@ -56,6 +56,7 @@ jobs:
             !__pycache__/
             !Pipfile
             !Pipfile.lock
+            !Makefile
 
   deploy:
     runs-on: ubuntu-latest
