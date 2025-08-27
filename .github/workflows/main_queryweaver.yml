@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - main
+      - staging
   workflow_dispatch:
 
 jobs:
@@ -64,6 +65,8 @@ jobs:
     permissions:
       id-token: write #This is required for requesting the JWT
       contents: read #This is required for actions/checkout
+    env:
+      SLOT_NAME: ${{ github.ref_name == 'main' && 'Production' || github.ref_name == 'staging' && 'staging' }}
 
     steps:
       - name: Download artifact from build job
@@ -88,5 +91,5 @@ jobs:
         id: deploy-to-webapp
         with:
           app-name: 'queryweaver'
-          slot-name: 'Production'
+          slot-name: ${{ env.SLOT_NAME }}
           startup-command: 'python -m uvicorn api.index:app --host 0.0.0.0 --port $PORT'
