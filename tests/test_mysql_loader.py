@@ -111,7 +111,9 @@ class TestMySQLLoader:
         # Mock connection failure
         mock_connect.side_effect = Exception("Connection failed")
 
-        success, message = asyncio.run(MySQLLoader.load("test_prefix", "mysql://user:pass@host:3306/db"))
+        success, message = asyncio.run(
+            MySQLLoader.load("test_prefix", "mysql://user:pass@host:3306/db")
+        )
 
         assert success is False
         assert "Error loading MySQL schema" in message

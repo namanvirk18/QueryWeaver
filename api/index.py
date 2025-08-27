@@ -7,7 +7,7 @@ app = create_app()
 if __name__ == "__main__":
     import os
     import uvicorn
-    
+
     # Read FASTAPI_DEBUG to determine debug mode
     debug_mode = os.environ.get('FASTAPI_DEBUG', 'False').lower() == 'true'
     uvicorn.run(

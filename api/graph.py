@@ -100,12 +100,12 @@ async def _find_tables(
             nullable: columns.nullable
         })
     """
-    
+
     tasks = [
         _query_graph(graph, query, {"embedding": embedding})
         for embedding in embeddings
     ]
-    
+
     results = await asyncio.gather(*tasks)
     return [row for rows in results for row in rows]
 
@@ -140,12 +140,12 @@ async def _find_tables_by_columns(
                 nullable: columns.nullable
             })
     """
-    
+
     tasks = [
         _query_graph(graph, query, {"embedding": embedding})
         for embedding in embeddings
     ]
-    
+
     results = await asyncio.gather(*tasks)
     return [row for rows in results for row in rows]
 
@@ -200,7 +200,7 @@ async def _find_connecting_tables(
     pairs = [list(pair) for pair in combinations(table_names, 2)]
     if not pairs:
         return []
-    
+
     query = """
     UNWIND $pairs AS pair
     MATCH (a:Table {name: pair[0]})
@@ -286,33 +286,34 @@ async def find(
 
     json_data = json.loads(completion_result.choices[0].message.content)
     descriptions = Descriptions(**json_data)
-    descriptions_text = [desc.description for desc in descriptions.tables_descriptions] + [desc.description for desc in descriptions.columns_descriptions]
+    descriptions_text = ([desc.description for desc in descriptions.tables_descriptions] +
+                         [desc.description for desc in descriptions.columns_descriptions])
     if not descriptions_text:
         return []
-    
+
     embedding_results = Config.EMBEDDING_MODEL.embed(descriptions_text)
-    
+
     # Split embeddings back into table and column embeddings
     table_embeddings = embedding_results[:len(descriptions.tables_descriptions)]
     column_embeddings = embedding_results[len(descriptions.tables_descriptions):]
 
     main_tasks = []
-    
+
     if table_embeddings:
         main_tasks.append(_find_tables(graph, table_embeddings))
     if column_embeddings:
         main_tasks.append(_find_tables_by_columns(graph, column_embeddings))
-    
+
     # Execute the main embedding-based searches in parallel
     results = await asyncio.gather(*main_tasks)
-    
+
     # Unpack results based on what tasks we ran
     tables_des = results[0] if table_embeddings else []
     tables_by_columns_des = results[1] if (table_embeddings and column_embeddings) else []
 
     # Extract table names once for reuse
     found_table_names = [t[0] for t in tables_des] if tables_des else []
-    
+
     # Only run sphere and connecting searches if we found tables
     if found_table_names:
         secondary_tasks = [
@@ -328,7 +329,7 @@ async def find(
     )
 
     return combined_tables
-    
+
 def _get_unique_tables(tables_list):
     # Dictionary to store unique tables with the table name as the key
     unique_tables = {}
