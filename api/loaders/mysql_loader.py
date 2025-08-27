@@ -158,7 +158,7 @@ class MySQLLoader(BaseLoader):
             conn.close()
 
             # Load data into graph
-            await load_to_graph(prefix + "_" + db_name, entities, relationships,
+            await load_to_graph(f"{prefix}_{db_name}", entities, relationships,
                          db_name=db_name, db_url=connection_url)
 
             return True, (f"MySQL schema loaded successfully. "

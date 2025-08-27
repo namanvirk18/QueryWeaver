@@ -197,7 +197,7 @@ deep nesting to minimize complexity and optimize performance."""
 
             await load_to_graph(graph_id, tables, relationships, db_name=db_name)
             return True, "Data dictionary loaded successfully into graph"
-        
+
         except Exception as e:
             return False, f"Error loading CSV: {str(e)}"
             # else:

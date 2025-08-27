@@ -7,7 +7,7 @@ callbacks can invoke them when processing OAuth responses.
 import logging
 from typing import Dict, Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from authlib.integrations.starlette_client import OAuth
 
 from .user_management import ensure_user_in_organizations
@@ -19,10 +19,8 @@ def setup_oauth_handlers(app: FastAPI, oauth: OAuth):
     # Store oauth in app state for access in routes
     app.state.oauth = oauth
 
-    async def handle_google_callback(_request: Request,
-                                     _token: Dict[str, Any],
-                                     user_info: Dict[str, Any]):
-        """Handle Google OAuth callback processing"""
+    async def handle_callback(provider: str, user_info: Dict[str, Any], api_token: str):
+        """Handle Provider OAuth callback processing"""
         try:
             user_id = user_info.get("id")
             email = user_info.get("email")
@@ -30,7 +28,7 @@ def setup_oauth_handlers(app: FastAPI, oauth: OAuth):
 
             # Validate required fields
             if not user_id or not email:
-                logging.error("Missing required fields from Google OAuth response")
+                logging.error("Missing required fields from %s OAuth response", provider)
                 return False
 
             # Check if identity exists in Organizations graph, create if new
@@ -38,43 +36,15 @@ def setup_oauth_handlers(app: FastAPI, oauth: OAuth):
                 user_id,
                 email,
                 name,
-                "google",
+                provider,
+                api_token,
                 user_info.get("picture"),
             )
 
             return True
         except Exception as exc:  # capture exception for logging
-            logging.error("Error handling Google OAuth callback: %s", exc)
-            return False
-
-    async def handle_github_callback(_request: Request,
-                                     _token: Dict[str, Any],
-                                     user_info: Dict[str, Any]):
-        """Handle GitHub OAuth callback processing"""
-        try:
-            user_id = user_info.get("id")
-            email = user_info.get("email")
-            name = user_info.get("name") or user_info.get("login")
-
-            # Validate required fields
-            if not user_id or not email:
-                logging.error("Missing required fields from GitHub OAuth response")
-                return False
-
-            # Check if identity exists in Organizations graph, create if new
-            _, _ = await ensure_user_in_organizations(
-                user_id,
-                email,
-                name,
-                "github",
-                user_info.get("picture"),
-            )
-
-            return True
-        except Exception as exc:  # capture exception for logging
-            logging.error("Error handling GitHub OAuth callback: %s", exc)
+            logging.error("Error handling %s OAuth callback: %s", provider, exc)
             return False
 
     # Store handlers in app state for use in route callbacks
-    app.state.google_callback_handler = handle_google_callback
-    app.state.github_callback_handler = handle_github_callback
+    app.state.callback_handler = handle_callback
