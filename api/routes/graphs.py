@@ -363,7 +363,7 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
             logging.info("Calling to analysis agent with query: %s",
                          sanitize_query(queries_history[-1]))
             memory_tool = await memory_tool_task
-            search_memories = await memory_tool.search_memories_concurrent(
+            search_memories = await memory_tool.search_memories(
                 query=queries_history[-1]
             )
             
@@ -382,6 +382,11 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
             answer_an = agent_an.get_analysis(
                 queries_history[-1], result, db_description, instructions, memory_context
             )
+
+            # Initialize response variables
+            user_readable_response = ""
+            follow_up_result = ""
+            execution_error = ""
 
             logging.info("Generated SQL query: %s", answer_an['sql_query'])
             yield json.dumps(
@@ -538,6 +543,7 @@ What this will do:
                     )
 
                 except Exception as e:
+                    execution_error = str(e)
                     overall_elapsed = time.perf_counter() - overall_start
                     logging.error("Error executing SQL query: %s", str(e))
                     logging.info(
@@ -569,34 +575,50 @@ What this will do:
                     overall_elapsed
                 )
 
+            # Save conversation to memory (only for on-topic queries)
+            # Determine the final answer based on which path was taken
+            final_answer = user_readable_response if user_readable_response else follow_up_result
+
+            # Build comprehensive response for memory
+            full_response = {
+                "question": queries_history[-1],
+                "generated_sql": answer_an.get('sql_query', ""),
+                "answer": final_answer
+            }
+            
+            # Add error information if SQL execution failed
+            if execution_error:
+                full_response["error"] = execution_error
+                full_response["success"] = False
+            else:
+                full_response["success"] = True
+
+            
+            # Save query to memory
+            save_query_task = asyncio.create_task(
+                memory_tool.save_query_memory(
+                    query=queries_history[-1],
+                    sql_query=answer_an["sql_query"],
+                    success=full_response["success"],
+                    error=execution_error
+                )
+            )
+            save_query_task.add_done_callback(
+                lambda t: logging.error(f"Query memory save failed: {t.exception()}") 
+                if t.exception() else logging.info("Query memory saved successfully")
+            )
+            
+            # Save conversation with memory tool (run in background)
+            save_task = asyncio.create_task(memory_tool.add_new_memory(full_response))
+            # Add error handling callback to prevent silent failures
+            save_task.add_done_callback(lambda t: logging.error(f"Memory save failed: {t.exception()}") if t.exception() else logging.info("Conversation saved to memory tool"))
+            logging.info("Conversation save task started in background")
+
         # Log timing summary at the end of processing
         overall_elapsed = time.perf_counter() - overall_start
         logging.info("Query processing pipeline completed - Total time: %.2f seconds",
                      overall_elapsed)
 
-        # Save conversation to memory manager if available
-        if memory_tool:
-            try:
-                # Convert chat history to conversation format for memory manager
-                conversation = []
-                for i, query in enumerate(queries_history):
-                    conversation_entry = {
-                        "question": query,
-                        "answer": result_history[i] if result_history and i < len(result_history) else "",
-                    }
-                    # Add SQL if this was the last query and we generated one
-                    if i == len(queries_history) - 1 and 'answer_an' in locals() and answer_an.get('sql_query'):
-                        conversation_entry["sql"] = answer_an['sql_query']
-                    
-                    conversation.append(conversation_entry)
-
-                # Save conversation with memory tool (run in background)
-                save_task = asyncio.create_task(memory_tool.add_new_memory(conversation))
-                # Add error handling callback to prevent silent failures
-                save_task.add_done_callback(lambda t: logging.error(f"Memory save failed: {t.exception()}") if t.exception() else logging.info("Conversation saved to memory tool"))
-                logging.info("Conversation save task started in background")
-            except Exception as e:
-                logging.error(f"Failed to save conversation to memory tool: {e}")
 
     return StreamingResponse(generate(), media_type="application/json")
 
@@ -626,6 +648,9 @@ async def confirm_destructive_operation(
 
     # Create a generator function for streaming the confirmation response
     async def generate_confirmation():
+        # Create memory tool for saving query results
+        memory_tool = await MemoryTool.create(request.state.user_id, graph_id)
+        
         if confirmation == "CONFIRM":
             try:
                 db_description, db_url = await get_db_description(graph_id)
@@ -707,8 +732,37 @@ async def confirm_destructive_operation(
                     }
                 ) + MESSAGE_DELIMITER
 
+                # Save successful confirmed query to memory
+                save_query_task = asyncio.create_task(
+                    memory_tool.save_query_memory(
+                        query=queries_history[-1] if queries_history else "Destructive operation confirmation",
+                        sql_query=sql_query,
+                        success=True,
+                        error=""
+                    )
+                )
+                save_query_task.add_done_callback(
+                    lambda t: logging.error(f"Confirmed query memory save failed: {t.exception()}") 
+                    if t.exception() else logging.info("Confirmed query memory saved successfully")
+                )
+
             except Exception as e:
                 logging.error("Error executing confirmed SQL query: %s", str(e))
+                
+                # Save failed confirmed query to memory
+                save_query_task = asyncio.create_task(
+                    memory_tool.save_query_memory(
+                        query=queries_history[-1] if queries_history else "Destructive operation confirmation",
+                        sql_query=sql_query,
+                        success=False,
+                        error=str(e)
+                    )
+                )
+                save_query_task.add_done_callback(
+                    lambda t: logging.error(f"Failed confirmed query memory save failed: {t.exception()}") 
+                    if t.exception() else logging.info("Failed confirmed query memory saved successfully")
+                )
+                
                 yield json.dumps(
                     {"type": "error", "message": "Error executing query"}
                 ) + MESSAGE_DELIMITER

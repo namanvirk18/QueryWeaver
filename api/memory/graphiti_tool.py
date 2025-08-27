@@ -39,8 +39,13 @@ class MemoryTool:
         user_memory_db = f"{user_id}-memory"
         falkor_driver = FalkorDriver(falkor_db=db, database=user_memory_db)
 
+        vector_size = Config.EMBEDDING_MODEL.get_vector_size()
         # Create Graphiti client with Azure OpenAI configuration
         self.graphiti_client = create_graphiti_client(falkor_driver)
+
+        driver = self.graphiti_client.driver
+        driver.execute_query(f"CREATE VECTOR INDEX FOR (p:Query) ON (p.embeddings) OPTIONS {{dimension:{vector_size}, similarityFunction:'euclidean'}}")
+
 
         self.user_id = user_id
         self.graph_id = graph_id
@@ -130,8 +135,8 @@ class MemoryTool:
         except Exception as e:
             print(f"Error creating database node for {database_name}: {e}")
             return None
-        
-    async def add_new_memory(self, conversation: List[Dict[str, Any]]) -> bool:
+
+    async def add_new_memory(self, conversation: Dict[str, Any]) -> bool:
         # Use LLM to analyze and summarize the conversation with current database context
         analysis = await self.summarize_conversation(conversation)
         user_id = self.user_id
@@ -157,6 +162,146 @@ class MemoryTool:
                     reference_time=datetime.now(),
                     source_description=f"Personal memory for user {user_id}"
                 )
+
+    async def save_query_memory(self, query: str, sql_query: str, success: bool, error: str = None) -> bool:
+        """
+        Save individual query memory directly to the database node.
+        
+        Args:
+            query: The user's natural language query
+            sql_query: The generated SQL query
+            success: Whether the query execution was successful
+            error: Error message if the query failed
+            
+        Returns:
+            bool: True if memory was saved successfully, False otherwise
+        """
+        try:
+            database_name = self.graph_id
+            
+            # Find the database node
+            database_node_name = f"Database {database_name}"
+            node_search_config = NODE_HYBRID_SEARCH_RRF.model_copy(deep=True)
+            node_search_config.limit = 1
+            
+            database_node_results = await self.graphiti_client.search_(
+                query=database_node_name,
+                config=node_search_config,
+            )
+            
+            # Check if database node exists
+            database_node_exists = False
+            for node in database_node_results.nodes:
+                if node.name == database_node_name:
+                    database_node_exists = True
+                    database_node_uuid = node.uuid
+                    break
+            if not database_node_exists:
+                return False
+
+            # Create Cypher query to create Query node and relationship
+            relationship_type = "SUCCESS" if success else "FAILED"
+            
+            # Escape quotes in the query and SQL for Cypher
+            escaped_query = query.replace("'", "\\'").replace('"', '\\"')
+            escaped_sql = sql_query.replace("'", "\\'").replace('"', '\\"')
+            escaped_error = error.replace("'", "\\'").replace('"', '\\"') if error else ""
+            embeddings = Config.EMBEDDING_MODEL.embed(escaped_query)[0]
+
+
+            # Create the Query node and relationship using Cypher
+            cypher_query = f"""
+            MERGE (db:Entity {{uuid: "{database_node_uuid}"}})
+            CREATE (q:Query {{
+                user_query: "{escaped_query}",
+                sql_query: "{escaped_sql}",
+                success: {str(success).lower()},
+                error: "{escaped_error}",
+                timestamp: "{datetime.now().isoformat()}",
+                embeddings: vecf32($embedding)
+            }})
+            CREATE (db)-[:{relationship_type}]->(q)
+            RETURN q.uuid as query_uuid
+            """
+            
+            # Execute the Cypher query through Graphiti's graph driver
+            graph_driver = self.graphiti_client.driver
+            try:
+                result = await graph_driver.execute_query(cypher_query, embedding=embeddings)
+                return True
+            except Exception as cypher_error:
+                print(f"Error executing Cypher query: {cypher_error}")
+                return False
+            
+        except Exception as e:
+            print(f"Error saving query memory: {e}")
+            return False
+        
+    async def retrieve_similar_queries(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Retrieve similar queries from the memory database.
+
+        Args:
+            query: The original query to find similar queries for.
+            limit: The maximum number of similar queries to retrieve.
+
+        Returns:
+            A list of similar query metadata.
+        """
+        try:
+            database_name = self.graph_id
+            
+            # Find the database node
+            database_node_name = f"Database {database_name}"
+            node_search_config = NODE_HYBRID_SEARCH_RRF.model_copy(deep=True)
+            node_search_config.limit = 1
+            
+            database_node_results = await self.graphiti_client.search_(
+                query=database_node_name,
+                config=node_search_config,
+            )
+            
+
+            # Check if database node exists
+            database_node_exists = False
+            for node in database_node_results.nodes:
+                if node.name == database_node_name:
+                    database_node_exists = True
+                    database_node_uuid = node.uuid
+                    break
+            if not database_node_exists:
+                return False
+
+            query_embedding = Config.EMBEDDING_MODEL.embed(query)[0]
+            cypher_query = f"""
+                    CALL db.idx.vector.queryNodes('Query', 'embeddings', 10, vecf32($embedding))
+                        YIELD node, score
+                        MATCH (db:Entity {{uuid: $database_node_uuid}})-[r]->(node)
+                        RETURN node {{
+                            .user_query,
+                            .sql_query,
+                            .success,
+                            .error,
+                        .timestamp
+                        }} AS query,
+                        score
+                        ORDER BY score ASC
+                        LIMIT {limit}
+            """
+            # Execute the Cypher query through Graphiti's graph driver
+            graph_driver = self.graphiti_client.driver
+            try:
+                records, header, _  = await graph_driver.execute_query(cypher_query, embedding=query_embedding, database_node_uuid=database_node_uuid)
+                similar_queries = [record["query"] for record in records]
+                return similar_queries
+
+            except Exception as cypher_error:
+                print(f"Error executing Cypher query: {cypher_error}")
+                return []
+
+        except Exception as e:
+            print(f"Error retrieving similar queries: {e}")
+            return []
 
     async def search_user_summary(self, limit: int = 5) -> str:
         """
@@ -220,17 +365,13 @@ class MemoryTool:
 
             if center_node_uuid is None:
                 return ""
-   
-            
-            # Enhance query to focus on database-specific content
-            enhanced_query = f"Database {self.graph_id} and the query: {query}"
+
 
             reranked_results = await self.graphiti_client.search(
-                query=enhanced_query,
+                query=query,
                 center_node_uuid=center_node_uuid,
                 num_results=limit
             )
-            
             
             # Filter and format results for database-specific content into a single string
             database_facts_text = []
@@ -261,7 +402,7 @@ class MemoryTool:
             print(f"Error searching database facts for {self.graph_id}: {e}")
             return ""
 
-    async def search_memories_concurrent(self, query: str, user_limit: int = 5, database_limit: int = 10) -> Dict[str, Any]:
+    async def search_memories(self, query: str, user_limit: int = 5, database_limit: int = 10) -> Dict[str, Any]:
         """
         Run both user summary and database facts searches concurrently for better performance.
         
@@ -277,17 +418,20 @@ class MemoryTool:
             # Run both searches concurrently using asyncio.gather
             user_summary_task = self.search_user_summary(limit=user_limit)
             database_facts_task = self.search_database_facts(query=query, limit=database_limit)
+            queries_task = self.retrieve_similar_queries(query=query, limit=5)
             
             # Wait for both to complete
-            user_summary, database_facts = await asyncio.gather(
+            user_summary, database_facts, similar_queries = await asyncio.gather(
                 user_summary_task,
                 database_facts_task,
+                queries_task,
                 return_exceptions=True
             )
             
             return {
                 "user_summary": user_summary,
                 "database_facts": database_facts,
+                "similar_queries": similar_queries
             }
             
         except Exception as e:
@@ -309,34 +453,45 @@ class MemoryTool:
         """
         # Format conversation for summarization
         conv_text = ""
-        for exchange in conversation:
-            conv_text += f"User: {exchange.get('question', '')}\n"
-            if exchange.get('sql'):
-                conv_text += f"SQL: {exchange['sql']}\n"
-            if exchange.get('answer'):
-                conv_text += f"Assistant: {exchange['answer']}\n"
-            conv_text += "\n"
+        conv_text += f"User: {conversation.get('question', '')}\n"
+        if conversation.get('generated_sql'):
+            conv_text += f"SQL: {conversation['generated_sql']}\n"
+        if conversation.get('error'):
+            conv_text += f"Error: {conversation['error']}\n"
+        if conversation.get('answer'):
+            conv_text += f"Assistant: {conversation['answer']}\n"
+        
+        # Add success/failure status
+        success_status = conversation.get('success', True)
+        conv_text += f"Execution Status: {'Success' if success_status else 'Failed'}\n"
+        conv_text += "\n"
         
         prompt = f"""
-                Analyze this QueryWeaver conversation between user "{self.user_id}" and database "{self.graph_id}".
+                Analyze this QueryWeaver question-answer interaction between user "{self.user_id}" and database "{self.graph_id}".
+                The conversation contains a single question from the user, the generated SQL query, and the assistant's response.
+                If the SQL execution failed, document that this specific query failed on this database with the specific error encountered.
                 Your task is to extract two complementary types of memory:
 
-                1. Database-Specific Summary: What the user accomplished and their preferences with this specific database.
-                2. Personal Memory: General information about the user (name, preferences, personal details) that is not specific to this database.
+                1. Database-Specific Summary: What the user accomplished and their interaction with this specific database.
+                2. Personal Memory: Overall preferences, personalizations, and information that relates to all databases (not specific to this one).
 
-                Conversation:
+                Question-Answer Interaction:
                 {conv_text}
 
                 Format your response as JSON:
                 {{
                     "database_summary": "Summarize in natural language what the user was trying to accomplish with this database, highlighting the approaches, techniques, queries, or SQL patterns that worked well, noting errors or problematic patterns to avoid, listing the most important or effective queries executed, and sharing key learnings or insights about the database’s structure, data, and optimal usage patterns.",
-                    "personal_memory": "Summarize any personal information about the user, including their name if mentioned, their general preferences and working style, their SQL or database expertise level, recurring query patterns or tendencies across all databases, and any other personal details that are not specific to a particular database, making sure not to include any database-specific memories."
+                    "personal_memory": "CONCISE summary of the user's overall preferences, personalizations, and cross-database characteristics. Include: their name if mentioned, general working style, SQL expertise level, communication patterns, recurring preferences that apply to ALL databases, and personal details that would be relevant across different database interactions. Keep this VERY CONCISE and focused on universal user traits, not database-specific information."
                 }}
 
                 Instructions:
-                - Only include fields that have actual information from the conversation.
-                - Use empty strings for fields with no information.
-                - Do not invent any information that is not present in the conversation.
+                - Keep summaries CONCISE, especially the personal_memory field.
+                - Personal Memory must contain ONLY information that applies across ALL databases, not specific to this database.
+                - Include error information in database_summary when SQL execution fails to help avoid similar issues.
+                - Only include fields that have actual information from the interaction.
+                - Use empty strings for fields with no relevant information.
+                - Do not invent any information that is not present in the interaction.
+                - Focus on the single question-answer pair provided.
                 """
 
         
