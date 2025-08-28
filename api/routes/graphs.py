@@ -308,6 +308,7 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
         follow_up_agent = FollowUpAgent(queries_history, result_history)
 
         step = {"type": "reasoning_step",
+                "final_response": False,
                 "message": "Step 1: Analyzing user query and generating SQL..."}
         yield json.dumps(step) + MESSAGE_DELIMITER
         # Ensure the database description is loaded
@@ -322,6 +323,7 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
                          overall_elapsed)
             yield json.dumps({
                 "type": "error",
+                "final_response": True,
                 "message": "Unable to determine database type"
             }) + MESSAGE_DELIMITER
             return
@@ -348,6 +350,7 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
 
             step = {
                 "type": "followup_questions",
+                "final_response": True,
                 "message": "Off topic question: " + answer_rel["reason"],
             }
             logging.info("SQL Fail reason: %s", answer_rel["reason"])
@@ -367,16 +370,8 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
                 query=queries_history[-1]
             )
             
-            # Extract memory context for the analysis agent
-            user_context = search_memories.get("user_summary", "")
-            database_context = search_memories.get("database_facts", "")
-            
-            # Prepare memory context description for the agent
-            memory_context = ""
-            if user_context:
-                memory_context += f"USER CONTEXT (Personal preferences and information):\n{user_context}\n\n"
-            if database_context:
-                memory_context += f"DATABASE INTERACTION HISTORY (Previous queries and learnings about this database):\n{database_context}\n\n"
+            # Extract the pre-built memory context from the search results
+            memory_context = search_memories.get("memory_context", "")
             
             logging.info("Starting SQL generation with analysis agent")
             answer_an = agent_an.get_analysis(
@@ -386,7 +381,7 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
             # Initialize response variables
             user_readable_response = ""
             follow_up_result = ""
-            execution_error = ""
+            execution_error = False
 
             logging.info("Generated SQL query: %s", answer_an['sql_query'])
             yield json.dumps(
@@ -398,6 +393,7 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
                     "amb": answer_an["ambiguities"],
                     "exp": answer_an["explanation"],
                     "is_valid": answer_an["is_sql_translatable"],
+                    "final_response": False,
                 }
             ) + MESSAGE_DELIMITER
 
@@ -450,7 +446,8 @@ What this will do:
                             "type": "destructive_confirmation",
                             "message": confirmation_message,
                             "sql_query": sql_query,
-                            "operation_type": sql_type
+                            "operation_type": sql_type,
+                            "final_response": False,
                         }
                     ) + MESSAGE_DELIMITER
                     # Log end-to-end time for destructive operation that requires confirmation
@@ -462,7 +459,7 @@ What this will do:
                     return  # Stop here and wait for user confirmation
 
                 try:
-                    step = {"type": "reasoning_step", "message": "Step 2: Executing SQL query"}
+                    step = {"type": "reasoning_step", "final_response": False, "message": "Step 2: Executing SQL query"}
                     yield json.dumps(step) + MESSAGE_DELIMITER
 
                     # Check if this query modifies the database schema using the appropriate loader
@@ -476,12 +473,14 @@ What this will do:
                         {
                             "type": "query_result",
                             "data": query_results,
+                            "final_response": False
                         }
                     ) + MESSAGE_DELIMITER
 
                     # If schema was modified, refresh the graph using the appropriate loader
                     if is_schema_modifying:
                         step = {"type": "reasoning_step",
+                                "final_response": True,
                                "message": ("Step 3: Schema change detected - "
                                          "refreshing graph...")}
                         yield json.dumps(step) + MESSAGE_DELIMITER
@@ -499,6 +498,7 @@ What this will do:
                             yield json.dumps(
                                 {
                                     "type": "schema_refresh",
+                                    "final_response": False,
                                     "message": refresh_msg,
                                     "refresh_status": "success"
                                 }
@@ -509,6 +509,7 @@ What this will do:
                             yield json.dumps(
                                 {
                                     "type": "schema_refresh",
+                                    "final_response": False,
                                     "message": failure_msg,
                                     "refresh_status": "failed"
                                 }
@@ -517,6 +518,7 @@ What this will do:
                     # Generate user-readable response using AI
                     step_num = "4" if is_schema_modifying else "3"
                     step = {"type": "reasoning_step",
+                            "final_response": False,
                            "message": f"Step {step_num}: Generating user-friendly response"}
                     yield json.dumps(step) + MESSAGE_DELIMITER
 
@@ -531,6 +533,7 @@ What this will do:
                     yield json.dumps(
                         {
                             "type": "ai_response",
+                            "final_response": True,
                             "message": user_readable_response,
                         }
                     ) + MESSAGE_DELIMITER
@@ -551,9 +554,10 @@ What this will do:
                         overall_elapsed
                     )
                     yield json.dumps(
-                        {"type": "error", "message": "Error executing SQL query"}
+                        {"type": "error", "final_response": True, "message": "Error executing SQL query"}
                     ) + MESSAGE_DELIMITER
             else:
+                execution_error = "Missing information"
                 # SQL query is not valid/translatable - generate follow-up questions
                 follow_up_result = follow_up_agent.generate_follow_up_question(
                     user_question=queries_history[-1],
@@ -564,6 +568,7 @@ What this will do:
                 # Send follow-up questions to help the user
                 yield json.dumps({
                     "type": "followup_questions",
+                    "final_response": True,
                     "message": follow_up_result,
                     "missing_information": answer_an.get("missing_information", ""),
                     "ambiguities": answer_an.get("ambiguities", "")
@@ -613,6 +618,13 @@ What this will do:
             # Add error handling callback to prevent silent failures
             save_task.add_done_callback(lambda t: logging.error(f"Memory save failed: {t.exception()}") if t.exception() else logging.info("Conversation saved to memory tool"))
             logging.info("Conversation save task started in background")
+            
+            # Clean old memory in background (once per week cleanup)
+            clean_memory_task = asyncio.create_task(memory_tool.clean_memory())
+            clean_memory_task.add_done_callback(
+                lambda t: logging.error(f"Memory cleanup failed: {t.exception()}") 
+                if t.exception() else logging.info("Memory cleanup completed successfully")
+            )
 
         # Log timing summary at the end of processing
         overall_elapsed = time.perf_counter() - overall_start

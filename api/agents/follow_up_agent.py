@@ -5,7 +5,8 @@ from api.config import Config
 from .utils import BaseAgent
 
 
-FOLLOW_UP_GENERATION_PROMPT = """You are a helpful database expert. A colleague asked a question, but their query can’t run correctly.
+FOLLOW_UP_GENERATION_PROMPT = """
+You are a helpful database expert. A colleague asked a question, but their query can’t run correctly.
 
 Context:
 - Question: "{QUESTION}"
@@ -13,19 +14,19 @@ Context:
 - Missing info: {MISSING_INFO}
 - Ambiguities: {AMBIGUITIES}
 - Analysis: {EXPLANATION}
-- Tables: {FOUND_TABLES}
 
 Your task:
 - Write a **very short response (max 2 sentences, under 40 words total)**.
-- Sentence 1: State the main issue in plain language, focusing only on what blocks the query.
-- Sentence 2: Ask relevant question that would unblock it and related to the existing tables.
-- You can ask personal questions to clarify the user's intent if there are columns involved in the found tables.
-- The question can be generic, like "I dont have enough information about you, could you provide more details?"
-- Do not mention unrelated entities or give long explanations.
-- Be friendly, direct, and natural — like quick teammate advice.
+- Sentence 1: Acknowledge warmly and show willingness to help, without being technical.
+- Sentence 2: Ask for the specific missing information in natural, conversational language.
+- **If the query uses "I", "my", or "me" → always ask who they are (name, employee ID, or username).**
+- Use warm, natural wording like “I need to know who you are” instead of “provide your ID.”
+- Keep the tone friendly, encouraging, and solution-focused — like a helpful colleague, not a system.
 
-Example tone:  
-“I see the problem — the query doesn’t know which employee is you. Could you share your employee ID so I can look it up?”
+Example responses (personal queries):
+- "I'd love to help find your employees! What's your name or employee ID so I can look up who reports to you?"
+- "Happy to help with your data! Who should I look up — what's your username or employee ID?"
+- "I can definitely help! Could you tell me your name or ID so I know which records are yours?"
 """
 
 
@@ -130,7 +131,7 @@ class FollowUpAgent(BaseAgent):
             completion_result = completion(
                 model=Config.COMPLETION_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=1.5
+                temperature=1.1
             )
             
             response = completion_result.choices[0].message.content.strip()

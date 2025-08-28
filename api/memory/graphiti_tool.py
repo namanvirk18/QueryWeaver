@@ -5,7 +5,7 @@ Saves summarized conversations with user and database nodes.
 
 import asyncio
 import os
-from typing import Dict, Any, List, Optional
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 # Import Azure OpenAI components
@@ -22,9 +22,6 @@ from graphiti_core.embedder import OpenAIEmbedder, OpenAIEmbedderConfig
 from graphiti_core.cross_encoder import OpenAIRerankerClient
 from graphiti_core.search.search_config_recipes import NODE_HYBRID_SEARCH_RRF
 
-from typing import List, Dict, Any, Optional
-from datetime import datetime
-import json
 from api.config import Config
 
 
@@ -39,13 +36,9 @@ class MemoryTool:
         user_memory_db = f"{user_id}-memory"
         falkor_driver = FalkorDriver(falkor_db=db, database=user_memory_db)
 
-        vector_size = Config.EMBEDDING_MODEL.get_vector_size()
+       
         # Create Graphiti client with Azure OpenAI configuration
         self.graphiti_client = create_graphiti_client(falkor_driver)
-
-        driver = self.graphiti_client.driver
-        driver.execute_query(f"CREATE VECTOR INDEX FOR (p:Query) ON (p.embeddings) OPTIONS {{dimension:{vector_size}, similarityFunction:'euclidean'}}")
-
 
         self.user_id = user_id
         self.graph_id = graph_id
@@ -56,10 +49,12 @@ class MemoryTool:
     async def create(cls, user_id: str, graph_id: str) -> "MemoryTool":
         """Async factory to construct and initialize the tool."""
         self = cls(user_id, graph_id)
-        await asyncio.gather(
-            self._ensure_user_node(user_id),
-            self._ensure_database_node(graph_id, user_id),
-        )
+        await self._ensure_database_node(graph_id, user_id)
+
+        vector_size = Config.EMBEDDING_MODEL.get_vector_size()
+        driver = self.graphiti_client.driver
+        await driver.execute_query(f"CREATE VECTOR INDEX FOR (p:Query) ON (p.embeddings) OPTIONS {{dimension:{vector_size}, similarityFunction:'euclidean'}}")
+
         return self
 
     async def _ensure_user_node(self, user_id: str) -> Optional[str]:
@@ -137,31 +132,38 @@ class MemoryTool:
             return None
 
     async def add_new_memory(self, conversation: Dict[str, Any]) -> bool:
-        # Use LLM to analyze and summarize the conversation with current database context
+        # Use LLM to analyze and summarize the conversation with focus on graph-oriented database facts
         analysis = await self.summarize_conversation(conversation)
         user_id = self.user_id
         database_name = self.graph_id
 
         # Extract summaries
         database_summary = analysis.get("database_summary", "")
-        personal_memory = analysis.get("personal_memory", "")
-
-        if database_summary:
-            await self.graphiti_client.add_episode(
-                    name=f"Database_Summary_{user_id}_{database_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                    episode_body=f"User: {user_id}\nDatabase: {database_name}\nConversation: {database_summary}",
+        
+        try:
+            if database_summary:
+                await self.graphiti_client.add_episode(
+                    name=f"Database_Facts_{user_id}_{database_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    episode_body=f"Database: {database_name}\n{database_summary}",
                     source=EpisodeType.message,
                     reference_time=datetime.now(),
-                    source_description=f"User: {user_id} conversation with the Database: {database_name}"
+                    source_description=f"Graph-oriented facts about Database: {database_name} from User: {user_id} interaction"
                 )
-        if personal_memory:
+            
+            # Keep personal memory as it was originally (only question)
             await self.graphiti_client.add_episode(
-                    name=f"Personal_Memory_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                    episode_body=f"User: {user_id}\nPersonal Memory: {personal_memory}",
-                    source=EpisodeType.message,
-                    reference_time=datetime.now(),
-                    source_description=f"Personal memory for user {user_id}"
-                )
+                name=f"Personal_Memory_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                episode_body=f"User: {user_id}\n{conversation['question']}",
+                source=EpisodeType.message,
+                reference_time=datetime.now(),
+                source_description=f"Personal memory for user {user_id}"
+            )
+                
+        except Exception as e:
+            print(f"Error adding new memory episodes: {e}")
+            return False
+        
+        return True
 
     async def save_query_memory(self, query: str, sql_query: str, success: bool, error: str = None) -> bool:
         """
@@ -199,7 +201,7 @@ class MemoryTool:
             if not database_node_exists:
                 return False
 
-            # Create Cypher query to create Query node and relationship
+            # Check if Query node with same user_query and sql_query already exists
             relationship_type = "SUCCESS" if success else "FAILED"
             
             # Escape quotes in the query and SQL for Cypher
@@ -208,24 +210,39 @@ class MemoryTool:
             escaped_error = error.replace("'", "\\'").replace('"', '\\"') if error else ""
             embeddings = Config.EMBEDDING_MODEL.embed(escaped_query)[0]
 
+            # First check if a Query node with the same user_query and sql_query already exists
+            check_query = f"""
+            MATCH (db:Entity {{uuid: "{database_node_uuid}"}})
+            MATCH (db)-[r]->(q:Query)
+            WHERE q.user_query = "{escaped_query}" AND q.sql_query = "{escaped_sql}"
+            RETURN q.uuid as existing_query_uuid
+            LIMIT 1
+            """
+            
+            graph_driver = self.graphiti_client.driver
+            check_result = await graph_driver.execute_query(check_query)
+            
+            # If query already exists, don't create a duplicate
+            if check_result[0]:  # If records exist
+                print(f"Query with same user_query and sql_query already exists, skipping creation")
+                return True
 
-            # Create the Query node and relationship using Cypher
+            # Create the Query node and relationship using Cypher only if it doesn't exist
             cypher_query = f"""
-            MERGE (db:Entity {{uuid: "{database_node_uuid}"}})
-            CREATE (q:Query {{
+            MATCH (db:Entity {{uuid: "{database_node_uuid}"}})
+            MERGE (q:Query {{
                 user_query: "{escaped_query}",
                 sql_query: "{escaped_sql}",
                 success: {str(success).lower()},
                 error: "{escaped_error}",
-                timestamp: "{datetime.now().isoformat()}",
+                timestamp: timestamp(),
                 embeddings: vecf32($embedding)
             }})
-            CREATE (db)-[:{relationship_type}]->(q)
+            CREATE (db)-[:{relationship_type} {{timestamp: timestamp()}}]->(q)
             RETURN q.uuid as query_uuid
             """
             
             # Execute the Cypher query through Graphiti's graph driver
-            graph_driver = self.graphiti_client.driver
             try:
                 result = await graph_driver.execute_query(cypher_query, embedding=embeddings)
                 return True
@@ -270,7 +287,7 @@ class MemoryTool:
                     database_node_uuid = node.uuid
                     break
             if not database_node_exists:
-                return False
+                return []
 
             query_embedding = Config.EMBEDDING_MODEL.embed(query)[0]
             cypher_query = f"""
@@ -281,8 +298,7 @@ class MemoryTool:
                             .user_query,
                             .sql_query,
                             .success,
-                            .error,
-                        .timestamp
+                            .error
                         }} AS query,
                         score
                         ORDER BY score ASC
@@ -405,6 +421,7 @@ class MemoryTool:
     async def search_memories(self, query: str, user_limit: int = 5, database_limit: int = 10) -> Dict[str, Any]:
         """
         Run both user summary and database facts searches concurrently for better performance.
+        Also builds a comprehensive memory context string for the analysis agent.
         
         Args:
             query: Natural language query to search for database facts
@@ -412,7 +429,7 @@ class MemoryTool:
             database_limit: Maximum number of results for database facts search
             
         Returns:
-            Dict containing both user_summary and database_facts results
+            Dict containing user_summary, database_facts, similar_queries, and memory_context
         """
         try:
             # Run both searches concurrently using asyncio.gather
@@ -428,10 +445,53 @@ class MemoryTool:
                 return_exceptions=True
             )
             
+            # Handle potential exceptions
+            if isinstance(user_summary, Exception):
+                user_summary = ""
+            if isinstance(database_facts, Exception):
+                database_facts = ""
+            if isinstance(similar_queries, Exception):
+                similar_queries = []
+            
+            # Build comprehensive memory context
+            memory_context = ""
+            
+            if user_summary:
+                memory_context += f"{self.user_id} CONTEXT (Personal preferences and information):\n{user_summary}\n\n"
+            
+            if database_facts:
+                memory_context += f"{self.graph_id} INTERACTION HISTORY (Previous queries and learnings about this database):\n{database_facts}\n\n"
+
+            # Add similar queries context
+            if similar_queries:
+                memory_context += "SIMILAR QUERIES HISTORY:\n"
+                
+                # Separate successful and failed queries
+                successful_queries = [q for q in similar_queries if q.get('success', False)]
+                failed_queries = [q for q in similar_queries if not q.get('success', False)]
+                
+                if successful_queries:
+                    memory_context += "\nSUCCESSFUL QUERIES (Learn from these patterns):\n"
+                    for i, query_data in enumerate(successful_queries, 1):
+                        memory_context += f"{i}. Query: \"{query_data.get('user_query', '')}\"\n"
+                        memory_context += f"   Successful SQL: {query_data.get('sql_query', '')}\n\n"
+                
+                if failed_queries:
+                    memory_context += "FAILED QUERIES (Avoid these patterns):\n"
+                    for i, query_data in enumerate(failed_queries, 1):
+                        memory_context += f"{i}. Query: \"{query_data.get('user_query', '')}\"\n"
+                        memory_context += f"   Failed SQL: {query_data.get('sql_query', '')}\n"
+                        if query_data.get('error'):
+                            memory_context += f"   Error: {query_data.get('error')}\n"
+                        memory_context += f"   AVOID this approach.\n\n"
+                
+                memory_context += "\n"
+            
             return {
                 "user_summary": user_summary,
                 "database_facts": database_facts,
-                "similar_queries": similar_queries
+                "similar_queries": similar_queries,
+                "memory_context": memory_context
             }
             
         except Exception as e:
@@ -439,17 +499,51 @@ class MemoryTool:
             return {
                 "user_summary": "",
                 "database_facts": "",
+                "similar_queries": [],
+                "memory_context": ""
             }
 
-    async def summarize_conversation(self, conversation: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def clean_memory(self, days: int = 7) -> Dict[str, Any]:
         """
-        Use LLM to summarize the conversation and extract insights oriented to current database.
+        Clean memory by deleting nodes older than a cutoff based on node.created_at
+        or relationship.timestamp.
+
+        - Assumes node.created_at is stored as numeric epoch seconds.
+        - Accepts either numeric or ISO-8601 strings for relationship timestamps.
+        - Supports dry-run for safe inspection.
+        - Deletes in batches to reduce memory pressure.
+
+        Args:
+            days: Retention window (nodes older than this are removed).
+            labels: Restrict to specific labels (e.g., ["Entity", "Query"]).
+            dry_run: If True, do not delete; only report what would be deleted.
+            batch_size: Number of nodes per deletion batch.
+
+        Returns:
+            Dict containing counts per label, totals, errors, and cutoff info.
+        """
+        driver = self.graphiti_client.driver
+        query = """
+                MATCH (n)
+                WHERE count(n) > $min_val
+                WITH n ORDER BY n.timestamp) ASC
+                LIMIT $delete_val
+                DETACH DELETE n;
+                """
+
+        result, _, _ = await driver.execute_query(query)
+        print("debug", result)
+
+
+    async def summarize_conversation(self, conversation: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Use LLM to summarize the conversation and extract database-oriented insights.
         
         Args:
-            conversation: List of user/system exchanges
+            conversation: Dictionary containing conversation data
             
         Returns:
-            Dict with 'database_summary' and 'personal_memory' keys
+            Dict with 'database_summary' key containing direct text summary
         """
         # Format conversation for summarization
         conv_text = ""
@@ -467,31 +561,30 @@ class MemoryTool:
         conv_text += "\n"
         
         prompt = f"""
-                Analyze this QueryWeaver question-answer interaction between user "{self.user_id}" and database "{self.graph_id}".
-                The conversation contains a single question from the user, the generated SQL query, and the assistant's response.
-                If the SQL execution failed, document that this specific query failed on this database with the specific error encountered.
-                Your task is to extract two complementary types of memory:
+                Analyze this QueryWeaver question-answer interaction with database "{self.graph_id}".
+                Focus exclusively on extracting graph-oriented facts about the database and its entities, relationships, and structure.
 
-                1. Database-Specific Summary: What the user accomplished and their interaction with this specific database.
-                2. Personal Memory: Overall preferences, personalizations, and information that relates to all databases (not specific to this one).
+                Your task is to extract database-specific facts that imply connections between database "{self.graph_id}" and entities within the conversation:
+                - Specific entities (tables, columns, data types) mentioned or discovered
+                - Relationships between entities in database "{self.graph_id}"
+                - Data patterns, constraints, or business rules learned about "{self.graph_id}"
+                - Query patterns that work well with "{self.graph_id}" structure
+                - Errors specific to "{self.graph_id}" schema or data
+                - ALWAYS be explicit about database name "{self.graph_id}" in all facts
+
+                **Critical: Be very explicit about the database name in all facts. For example: "Database {self.graph_id} contains a customers table with columns id, name, revenue" instead of "The database contains a customers table"**
 
                 Question-Answer Interaction:
                 {conv_text}
 
-                Format your response as JSON:
-                {{
-                    "database_summary": "Summarize in natural language what the user was trying to accomplish with this database, highlighting the approaches, techniques, queries, or SQL patterns that worked well, noting errors or problematic patterns to avoid, listing the most important or effective queries executed, and sharing key learnings or insights about the database’s structure, data, and optimal usage patterns.",
-                    "personal_memory": "CONCISE summary of the user's overall preferences, personalizations, and cross-database characteristics. Include: their name if mentioned, general working style, SQL expertise level, communication patterns, recurring preferences that apply to ALL databases, and personal details that would be relevant across different database interactions. Keep this VERY CONCISE and focused on universal user traits, not database-specific information."
-                }}
-
                 Instructions:
-                - Keep summaries CONCISE, especially the personal_memory field.
-                - Personal Memory must contain ONLY information that applies across ALL databases, not specific to this database.
-                - Include error information in database_summary when SQL execution fails to help avoid similar issues.
-                - Only include fields that have actual information from the interaction.
-                - Use empty strings for fields with no relevant information.
-                - Do not invent any information that is not present in the interaction.
-                - Focus on the single question-answer pair provided.
+                - ALWAYS be explicit about database name "{self.graph_id}" in all facts
+                - Focus on graph relationships, entities, and structural facts about "{self.graph_id}"
+                - Include specific table names, column names, and data relationships discovered
+                - Document successful SQL patterns that work with "{self.graph_id}" structure
+                - Note any schema constraints or business rules specific to "{self.graph_id}"
+                - Emphasize connections between database "{self.graph_id}" and entities in the conversation
+                - Use empty string if no relevant database facts are discovered
                 """
 
         
@@ -502,22 +595,16 @@ class MemoryTool:
                 temperature=0.1
             )
             
-            # Parse JSON response
-            content = response.choices[0].message.content
-            if content.startswith("```json"):
-                content = content.replace("```json", "").replace("```", "").strip()
-            
-            result = json.loads(content)
+            # Parse the direct text response (no JSON parsing needed)
+            content = response.choices[0].message.content.strip()
             return {
-                "database_summary": result.get("database_summary", ""),
-                "personal_memory": result.get("personal_memory", "")
+                "database_summary": content
             }
             
         except Exception as e:
             print(f"Error in LLM summarization: {e}")
             return {
-                "database_summary": "",
-                "personal_memory": ""
+                "database_summary": ""
             }
 
 

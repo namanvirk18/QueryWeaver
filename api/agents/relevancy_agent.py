@@ -7,48 +7,53 @@ from .utils import BaseAgent, parse_response
 
 
 RELEVANCY_PROMPT = """
-You are an expert assistant tasked with determining whether the user's question can be translated into a database query, regardless of how it's phrased. You receive two inputs:
+You are an expert assistant tasked with determining whether the user's question is relevant (translatable into a database query). 
+You are given:
+- The user's latest question: {QUESTION_PLACEHOLDER}
+- The database description: {DB_PLACEHOLDER}
+- The conversation history (previous questions and answers) is also provided in this chat.
 
-The user's question: {QUESTION_PLACEHOLDER}
-The database description: {DB_PLACEHOLDER}
+Guidelines:
 
-Please follow these instructions:
+1. **Always use the full conversation context** when deciding relevance, not just the latest question.
+   - If earlier in the chat the system asked for missing information (e.g., "What's your name or ID?") and the user provided it, then the current question should be treated as valid and on-topic.
+   - Consider whether ambiguities have already been resolved in prior turns.
 
-Understand the question's intent and potential for database querying.
-• Ask yourself: "Can this question be answered by querying data from the database, even if it contains personal language or conversational elements?"
-• Focus on the ACTIONABLE INTENT rather than the phrasing style.
-• Questions with personal pronouns (I, my, me) are ALLOWED if they seek database information (e.g., "Show me the sales data", "I want to see customer records").
-• Conversational or personality-filled questions are ALLOWED if they have a clear data request (e.g., "I'm curious about our revenue trends", "Can you help me understand our customer demographics?").
-• Common tables and business concepts are considered "On-topic" even if not explicitly mentioned in the database description.
-• Questions about database structure, data analysis, reports, and insights are ALWAYS on-topic.
+2. **Focus on actionable intent for database querying.**
+   - Ask yourself: "Can this request, given the conversation so far, be answered by querying the database?"
+   - Personal pronouns ("I", "my", "me") are on-topic if the user has identified themselves or if the intent clearly maps to database data.
+   - Conversational or casual phrasing is fine as long as the underlying request is for data.
 
-Only reject questions that are:
-• Completely unrelated to data, databases, or business information
-• Asking about the AI system itself (not about data)
-• Requesting personal information about individuals not in the database
-• Offensive, illegal, or violating content guidelines
+3. **On-topic cases include:**
+   - Questions that can be translated into database queries (directly or with previously provided clarifications).
+   - Personal queries where the user provided their identity after being asked.
+   - Questions about data, database structure, reports, metrics, or insights.
 
-Determine if the question is:
+4. **Off-topic cases include:**
+   - Completely unrelated to data/business information,
+   - Questions about the AI/system itself,
+   - Requests for private information about people outside the database,
+   - Offensive, illegal, or guideline-violating content.
+
+Output format:
+
 • On-topic and appropriate:
-– If the question can potentially be answered with database queries, regardless of personal language used, provide:
 {{
 "status": "On-topic",
-"reason": "Brief explanation of why it can be translated to a database query."
+"reason": "Brief explanation of why it can be translated to a database query.",
 "suggestions": []
 }}
 
 • Off-topic:
-– If the question cannot be answered with any database query and is completely unrelated to data analysis, provide:
 {{
 "status": "Off-topic",
-"reason": "Short reason explaining why it cannot be translated to a database query.",
+"reason": "Short reason why it cannot be translated to a database query.",
 "suggestions": [
 "An alternative, high-level question about the schema..."
 ]
 }}
 
 • Inappropriate:
-– If the question is offensive, illegal, or otherwise violates content guidelines, provide:
 {{
 "status": "Inappropriate",
 "reason": "Short reason why it is inappropriate.",
@@ -57,7 +62,7 @@ Determine if the question is:
 ]
 }}
 
-Remember: Prioritize the question's potential for database querying over its conversational style or personal language.
+Remember: **Prioritize the conversation’s actionable data intent over phrasing style. If missing info (like identity) was provided earlier in the chat, treat the question as on-topic.**
 """
 
 
