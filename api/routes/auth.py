@@ -122,7 +122,7 @@ def _validate_email(email: str) -> bool:
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(pattern, email) is not None
 
-def _create_email_user(first_name: str, last_name: str, email: str, password_hash: str):
+async def _create_email_user(first_name: str, last_name: str, email: str, password_hash: str):
     """Create a new email user in the database."""
     try:
         organizations_graph = db.select_graph("Organizations")
@@ -138,7 +138,7 @@ def _create_email_user(first_name: str, last_name: str, email: str, password_has
         MATCH (i:Identity {provider: 'email', email: $email})
         RETURN i
         """
-        result = organizations_graph.query(check_query, {"email": email})
+        result = await organizations_graph.query(check_query, {"email": email})
 
         if result.result_set:
             return False, "User already exists"
@@ -162,7 +162,7 @@ def _create_email_user(first_name: str, last_name: str, email: str, password_has
         RETURN i, u
         """
 
-        result = organizations_graph.query(create_query, {
+        result = await organizations_graph.query(create_query, {
             "email": email,
             "password_hash": password_hash,
             "name": name
@@ -221,22 +221,22 @@ def _authenticate_email_user(email: str, password: str):
 
 # ---- Email Authentication Routes ----
 @auth_router.post("/email-signup")
-async def email_signup(request: Request, signup_data: EmailSignupRequest) -> JSONResponse:
+async def email_signup(request: Request, signup_data: EmailSignupRequest) -> RedirectResponse:
     """Handle email/password user registration."""
     try:
         # Check if email authentication is enabled
         if os.getenv("EMAIL_AUTH_ENABLED", "").lower() not in ["true", "1", "yes", "on"]:
-            return JSONResponse(
-                {"success": False, "error": "Email authentication is not enabled"},
-                status_code=status.HTTP_403_FORBIDDEN
-            )
+            raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="GEmail authentication is not enabled"
+        )
 
         # Validate required fields
-        if not all([signup_data.firstName, signup_data.lastName, 
+        if not all([signup_data.firstName, signup_data.lastName,
                     signup_data.email, signup_data.password]):
-            return JSONResponse(
-                {"success": False, "error": "All fields are required"},
-                status_code=status.HTTP_400_BAD_REQUEST
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="All fields are required"
             )
 
         first_name = signup_data.firstName.strip()
@@ -246,41 +246,51 @@ async def email_signup(request: Request, signup_data: EmailSignupRequest) -> JSO
 
         # Validate email format
         if not _validate_email(email):
-            return JSONResponse(
-                {"success": False, "error": "Invalid email format"},
-                status_code=status.HTTP_400_BAD_REQUEST
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid email format"
             )
 
         # Validate password strength
         if len(password) < 8:
-            return JSONResponse(
-                {"success": False, "error": "Password must be at least 8 characters long"},
-                status_code=status.HTTP_400_BAD_REQUEST
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must be at least 8 characters long"
             )
 
         # Hash password
         password_hash = _hash_password(password)
 
         # Create user
-        success, result = _create_email_user(first_name, last_name, email, password_hash)
+        success, result = await _create_email_user(first_name, last_name, email, password_hash)
 
         if not success:
-            return JSONResponse(
-                {"success": False, "error": result}, 
-                status_code=status.HTTP_400_BAD_REQUEST
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result
             )
 
+        api_token = secrets.token_urlsafe(32)
         # Create organization association
-        ensure_user_in_organizations(email, email, f"{first_name} {last_name}", "email")
+        await ensure_user_in_organizations(email, email, f"{first_name} {last_name}", 
+                                           "email", api_token)
 
         logging.info("User registration successful: %s", _sanitize_for_log(email))
-        return JSONResponse({"success": True, "message": "User created successfully"})
+
+        redirect = RedirectResponse(url="/chat", status_code=302)
+        redirect.set_cookie(
+            key="api_token",
+            value=api_token,
+            httponly=True,
+            secure=True
+        )
+        return redirect
 
     except Exception as e:
         logging.error("Signup error: %s", e)
-        return JSONResponse(
-            {"success": False, "error": "Registration failed"}, 
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Registration failed"
         )
 
 @auth_router.post("/email-login")
@@ -398,8 +408,10 @@ def _build_callback_url(request: Request, path: str) -> str:
 # ---- Routes ----
 @auth_router.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
-
-    """Handle the home page, rendering the landing page for unauthenticated users and the chat page for authenticated users."""
+    """
+    Handle the home page, rendering the landing page for 
+    unauthenticated users and the chat page for authenticated users.
+    """
     user_info, is_authenticated_flag = await validate_user(request)
     auth_config = _get_auth_config()
 
@@ -435,7 +447,7 @@ async def login_google(request: Request) -> RedirectResponse:
     Returns:
         RedirectResponse: The redirect response to the Google OAuth endpoint.
     """
-    
+
     # Check if Google auth is enabled
     if not _is_google_auth_enabled():
         raise HTTPException(
@@ -459,8 +471,8 @@ async def login_google(request: Request) -> RedirectResponse:
 
 @auth_router.get("/login/google/authorized", response_class=RedirectResponse)
 async def google_authorized(request: Request) -> RedirectResponse:
-  
-    """Handle Google OAuth callback and user authorization.
+    """
+    Handle Google OAuth callback and user authorization.
 
     Args:
         request (Request): The incoming request.
