@@ -85,10 +85,11 @@ def sanitize_query(query: str) -> str:
     return query.replace('\n', ' ').replace('\r', ' ')[:500]
 
 def sanitize_log_input(value: str) -> str:
-    """Sanitize input for safe logging (remove newlines and carriage returns)."""
+    """Sanitize input for safe logging—remove newlines, carriage returns, tabs, and wrap in repr()."""
     if not isinstance(value, str):
-        return str(value)
-    return value.replace('\n', ' ').replace('\r', ' ')
+        value = str(value)
+    sanitized = value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+    return repr(sanitized)
 
 def _graph_name(request: Request, graph_id:str) -> str:
     if not graph_id or not isinstance(graph_id, str):
