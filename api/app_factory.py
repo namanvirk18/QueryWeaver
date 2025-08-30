@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi_mcp import FastApiMCP
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -51,10 +52,9 @@ def create_app():
             "Text2SQL with "
             "Graph-Powered Schema Understanding"
         ),
-    )    
-    
-    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+    )
 
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
     # Add session middleware with explicit settings to ensure OAuth state persists
     app.add_middleware(
@@ -81,8 +81,26 @@ def create_app():
     app.include_router(auth_router)
     app.include_router(graphs_router, prefix="/graphs")
     app.include_router(database_router)
+    # app.include_router(mcp_router, prefix="/mcp")
 
     setup_oauth_handlers(app, app.state.oauth)
+
+    # Control MCP endpoints via environment variable DISABLE_MCP
+    # Default: MCP is enabled unless DISABLE_MCP is set to true
+    disable_mcp = os.getenv("DISABLE_MCP", "false").lower() in ("1", "true", "yes")
+    if disable_mcp:
+        logging.info("MCP endpoints disabled via DISABLE_MCP environment variable")
+    else:
+        mcp = FastApiMCP(app,
+                         name="queryweaver",
+                         description="QueryWeaver MCP API, provides Text2SQL capabilities",
+                         include_operations=["list_databases",
+                                             "connect_database",
+                                             "database_schema",
+                                             "query_database"]
+                         )
+
+        mcp.mount_http()
 
     @app.exception_handler(Exception)
     async def handle_oauth_error(request: Request, exc: Exception):

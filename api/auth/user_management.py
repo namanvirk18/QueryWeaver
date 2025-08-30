@@ -234,10 +234,25 @@ async def validate_user(request: Request) -> Tuple[Optional[Dict[str, Any]], boo
     Includes refresh handling for Google.
     """
     try:
-        # token might be in the URL if not in the cookie for API access
+        # token might be in the cookie or in the URL (api_token) for API access
         api_token = request.cookies.get("api_token")
         if not api_token:
             api_token = request.query_params.get("api_token")
+
+        # If still not found, also accept Authorization: Bearer <token>
+        if not api_token:
+            auth_header = (
+                request.headers.get("authorization")
+                or request.headers.get("Authorization")
+            )
+            if auth_header:
+                try:
+                    parts = auth_header.split(None, 1)
+                    if len(parts) == 2 and parts[0].lower() == "bearer":
+                        api_token = parts[1].strip()
+                except Exception:
+                    # If parsing fails, ignore and continue (will return unauthenticated)
+                    api_token = None
 
         if api_token:
             db_info = await _get_user_info(api_token)

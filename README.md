@@ -5,99 +5,41 @@
 
 # QueryWeaver
 
-QueryWeaver is an open-source Text2SQL tool that transforms natural language into SQL using graph-powered schema understanding. Ask your database questions in plain English—QueryWeaver handles the weaving.
+QueryWeaver is an open-source Text2SQL tool that converts plain-English questions into SQL using graph-powered schema understanding. It helps you ask databases natural-language questions and returns SQL and results.
 
-## Setup
+![Screenshot](https://github.com/user-attachments/assets/a0be7bbd-0c99-4399-a302-2b9f7b419dd2)
 
-### Prerequisites
+TL;DR
+- Try quickly with Docker: `docker run -p 5000:5000 -it falkordb/queryweaver`
+- Develop locally: see "Development" section below
 
-- Python 3.12+
-- pipenv (for dependency management)
-- FalkorDB instance
+## Quick start — Docker (recommended for evaluation)
 
-- Node.js and npm (required for frontend TypeScript build)
-
-### Installation
-
-1. Clone the repository
-2. Install dependencies with Pipenv:
-   ```bash
-   pipenv sync
-   ```
-
-3. Set up environment variables by copying `.env.example` to `.env` and filling in your values:
-   ```bash
-   cp .env.example .env
-   ```
-
-### OAuth Configuration
-
-This application supports authentication via Google and GitHub OAuth. You'll need to set up OAuth applications for both providers:
-
-#### Google OAuth Setup
-
-1. Go to [Google Cloud Console](https://console.developers.google.com/)
-2. Create a new project or select an existing one
-3. Enable the Google+ API
-4. Go to "Credentials" and create an OAuth 2.0 Client ID
-5. Add your domain to authorized origins (e.g., `http://localhost:5000`)
-6. Add the callback URL: `http://localhost:5000/login/google/authorized`
-7. Copy the Client ID and Client Secret to your `.env` file
-
-#### GitHub OAuth Setup
-
-1. Go to GitHub Settings → Developer settings → OAuth Apps
-2. Click "New OAuth App"
-3. Fill in the application details:
-   - Application name: Your app name
-   - Homepage URL: `http://localhost:5000`
-   - Authorization callback URL: `http://localhost:5000/login/github/authorized`
-4. Copy the Client ID and Client Secret to your `.env` file
-
-### Running the Application
-
-```bash
-pipenv run uvicorn api.index:app --host "localhost" --port "5000"
-```
-
-The application will be available at `http://localhost:5000`.
-
-## Frontend build
-
-The project includes a TypeScript frontend located in the `app/` folder. Build the frontend before running the app in production or after modifying frontend source files.
-
-Install frontend deps and build (recommended):
-
-```bash
-make install   # installs backend and frontend deps
-make build-prod     # runs the frontend production build (produces app/public/js/app.js)
-```
-
-Or run directly from the `app/` folder:
-
-```bash
-cd app
-npm ci
-npm run build
-```
-
-### Running with Docker
-
-You can run QueryWeaver using Docker without installing Python dependencies locally:
+Run the official image locally (no local Python or Node required):
 
 ```bash
 docker run -p 5000:5000 -it falkordb/queryweaver
 ```
 
-The application will be available at `http://localhost:5000`.
+Open: http://localhost:5000
 
-#### Configuring with Environment Variables
+### Prefer using a .env file (recommended)
 
-You can configure the application by passing environment variables using the `-e` flag. You can copy the variables from `.env.example` and set them as needed:
+Create a local `.env` by copying `.env.example` and pass it to Docker. This is the simplest way to provide all required configuration:
+
+```bash
+cp .env.example .env
+# edit .env to set your values, then:
+docker run -p 5000:5000 --env-file .env falkordb/queryweaver
+```
+
+### Or pass individual environment variables
+
+If you prefer to pass variables on the command line, use `-e` flags (less convenient for many variables):
 
 ```bash
 docker run -p 5000:5000 -it \
-   -e FASTAPI_SECRET_KEY=your_super_secret_key_here \
+  -e FASTAPI_SECRET_KEY=your_super_secret_key_here \
   -e GOOGLE_CLIENT_ID=your_google_client_id \
   -e GOOGLE_CLIENT_SECRET=your_google_client_secret \
   -e GITHUB_CLIENT_ID=your_github_client_id \
@@ -106,74 +48,190 @@ docker run -p 5000:5000 -it \
   falkordb/queryweaver
 ```
 
-##### Using a .env File
+For a full list of configuration options, consult `.env.example`.
 
-You can also pass a full environment file to Docker using the `--env-file` option. This is the easiest way to provide all required configuration at once:
+## Development
+
+Follow these steps to run and develop QueryWeaver from source.
+
+### Prerequisites
+
+- Python 3.12+
+- pipenv
+- A FalkorDB instance (local or remote)
+- Node.js and npm (for the TypeScript frontend)
+
+### Install and configure
+
+Quickstart (recommended for development):
 
 ```bash
-docker run -p 5000:5000 --env-file .env falkordb/queryweaver
+# Clone the repo
+git clone https://github.com/FalkorDB/QueryWeaver.git
+cd QueryWeaver
+
+# Install dependencies (backend + frontend) and start the dev server
+make install
+make run-dev
 ```
 
-You can use the provided `.env.example` file as a template:
+If you prefer to set up manually or need a custom environment, use Pipenv:
 
 ```bash
+# Install Python (backend) and frontend dependencies
+pipenv sync --dev
+
+# Create a local environment file
 cp .env.example .env
-# Edit .env with your values, then run:
-docker run -p 5000:5000 --env-file .env falkordb/queryweaver
+# Edit .env with your values
 ```
 
-For a complete list of available configuration options, see the `.env.example` file in the repository.
+### Run the app locally
+
+```bash
+pipenv run uvicorn api.index:app --host 0.0.0.0 --port 5000 --reload
+```
+
+The server will be available at http://localhost:5000
+
+Alternatively, the repository provides Make targets for running the app:
+
+```bash
+make run-dev   # development server (reload, debug-friendly)
+make run-prod  # production mode (ensure frontend build if needed)
+```
+
+### Frontend build (when needed)
+
+The frontend is a TypeScript app in `app/`. Build before production runs or after frontend changes:
+
+```bash
+make install       # installs backend and frontend deps
+make build-prod    # builds the frontend into app/public/js/app.js
+
+# or manually
+cd app
+npm ci
+npm run build
+```
+
+### OAuth configuration
+
+QueryWeaver supports Google and GitHub OAuth. Create OAuth credentials for each provider and paste the client IDs/secrets into your `.env` file.
+
+- Google: set authorized origin and callback `http://localhost:5000/login/google/authorized`
+- GitHub: set homepage and callback `http://localhost:5000/login/github/authorized`
+
+## MCP server: host or connect (optional)
+
+QueryWeaver includes optional support for the Model Context Protocol (MCP). You can either have QueryWeaver expose an MCP-compatible HTTP surface (so other services can call QueryWeaver as an MCP server), or configure QueryWeaver to call an external MCP server for model/context services.
+
+What QueryWeaver provides
+- The app registers MCP operations focused on Text2SQL flows:
+   - `list_databases`
+   - `connect_database`
+   - `database_schema`
+   - `query_database`
+
+- To disable the built-in MCP endpoints set `DISABLE_MCP=true` in your `.env` or environment (default: MCP enabled).
+- Configuration
+
+- `DISABLE_MCP` — disable QueryWeaver's built-in MCP HTTP surface. Set to `true` to disable. Default: `false` (MCP enabled).
+
+Examples
+
+Disable the built-in MCP when running with Docker:
+
+```bash
+docker run -p 5000:5000 -it --env DISABLE_MCP=true falkordb/queryweaver
+```
+Calling the built-in MCP endpoints (example)
+- The MCP surface is exposed as HTTP endpoints. 
+
+
+### Server Configuration
+Below is a minimal example `mcp.json` client configuration that targets a local QueryWeaver instance exposing the MCP HTTP surface at `/mcp`.
+
+```json
+{
+   "servers": {
+      "queryweaver": {
+         "type": "http",
+         "url": "http://127.0.0.1:5000/mcp",
+         "headers": {
+            "Authorization": "Bearer your_token_here"
+         }
+      }
+   },
+   "inputs": []
+}
+```
 
 ## Testing
 
-QueryWeaver includes a comprehensive test suite with both unit and End-to-End (E2E) tests.
+> Quick note: many tests require FalkorDB to be available. Use the included helper to run a test DB in Docker if needed.
 
-### Quick Start
+### Prerequisites
+
+- Install dev dependencies: `pipenv sync --dev`
+- Start FalkorDB (see `make docker-falkordb`)
+- Install Playwright browsers: `pipenv run playwright install`
+
+### Quick commands
+
+Recommended: prepare the development/test environment using the Make helper (installs dependencies and Playwright browsers):
 
 ```bash
-# Set up test environment
+# Prepare development/test environment (installs deps and Playwright browsers)
+make setup-dev
+```
+
+Alternatively, you can run the E2E-specific setup script and then run tests manually:
+
+```bash
+# Prepare E2E test environment (installs browsers and other setup)
 ./setup_e2e_tests.sh
 
 # Run all tests
 make test
 
-# Run only unit tests
+# Run unit tests only (faster)
 make test-unit
 
 # Run E2E tests (headless)
 make test-e2e
 
-# Run E2E tests with visible browser
+# Run E2E tests with a visible browser for debugging
 make test-e2e-headed
 ```
 
-### Test Types
+### Test types
 
-- **Unit Tests**: Test individual components and functions
-- **E2E Tests**: Test complete user workflows using Playwright
-  - Basic functionality (page loading, UI structure)
-  - Authentication flows (OAuth integration)
-  - File upload and processing
-  - Chat interface and query handling
-  - API endpoint testing
+- Unit tests: focus on individual modules and utilities. Run with `make test-unit` or `pipenv run pytest tests/ -k "not e2e"`.
+- End-to-end (E2E) tests: run via Playwright and exercise UI flows, OAuth, file uploads, schema processing, chat queries, and API endpoints. Use `make test-e2e`.
 
-See [tests/e2e/README.md](tests/e2e/README.md) for detailed E2E testing documentation.
+See `tests/e2e/README.md` for full E2E test instructions.
 
 ### CI/CD
 
-Tests run automatically in GitHub Actions:
-- Unit tests run on every push/PR
-- E2E tests run with FalkorDB service
-- Test artifacts and screenshots saved on failure
+GitHub Actions run unit and E2E tests on pushes and pull requests. Failures capture screenshots and artifacts for debugging.
 
-## Introduction
+## Troubleshooting
 
-<img width="1863" height="996" alt="image" src="https://github.com/user-attachments/assets/a0be7bbd-0c99-4399-a302-2b9f7b419dd2" />
+- FalkorDB connection issues: start the DB helper `make docker-falkordb` or check network/host settings.
+- Playwright/browser failures: install browsers with `pipenv run playwright install` and ensure system deps are present.
+- Missing environment variables: copy `.env.example` and fill required values.
+
+## Project layout (high level)
+
+- `api/` – FastAPI backend
+- `app/` – TypeScript frontend
+- `tests/` – unit and E2E tests
 
 
-## LICENSE
+## License
 
 Licensed under the GNU Affero General Public License (AGPL). See [LICENSE](LICENSE.txt).
 
-Copyrights FalkorDB Ltd. 2025
+Copyright FalkorDB Ltd. 2025
 

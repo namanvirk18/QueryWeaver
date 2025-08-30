@@ -41,8 +41,8 @@ class ChatRequest(BaseModel):
     Args:
         BaseModel (_type_): _description_
     """
-    chat: list
-    result: list = None
+    chat: list[str]
+    result: list[str] = None
     instructions: str = None
 
 
@@ -105,11 +105,11 @@ def _graph_name(request: Request, graph_id:str) -> str:
 
     return f"{request.state.user_id}_{graph_id}"
 
-@graphs_router.get("")
+@graphs_router.get("", operation_id="list_databases")
 @token_required
 async def list_graphs(request: Request):
     """
-    This route is used to list all the graphs that are available in the database.
+    This route is used to list all the graphs (databases names) that are available in the database.
     """
     user_id = request.state.user_id
     user_graphs = await db.list_graphs()
@@ -118,15 +118,17 @@ async def list_graphs(request: Request):
                        for graph in user_graphs if graph.startswith(f"{user_id}_")]
     return JSONResponse(content=filtered_graphs)
 
-
-@graphs_router.get("/{graph_id}/data")
+@graphs_router.get("/{graph_id}/data", operation_id="database_schema")
 @token_required
 async def get_graph_data(request: Request, graph_id: str):
-    """Return all nodes and edges for the specified graph (namespaced to the user).
+    """Return all nodes and edges for the specified database schema (namespaced to the user).
 
     This endpoint returns a JSON object with two keys: `nodes` and `edges`.
     Nodes contain a minimal set of properties (id, name, labels, props).
     Edges contain source and target node names (or internal ids), type and props.
+    
+        args:
+            graph_id (str): The ID of the graph to query (the database name).
     """
     namespaced = _graph_name(request, graph_id)
     try:
@@ -274,11 +276,15 @@ async def load_graph(request: Request, data: GraphData = None, file: UploadFile 
     raise HTTPException(status_code=400, detail="Failed to load graph data")
 
 
-@graphs_router.post("/{graph_id}")
+@graphs_router.post("/{graph_id}", operation_id="query_database")
 @token_required
 async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
     """
-    text2sql
+    Query the Database with the given graph_id and chat_data.
+    
+        Args:
+            graph_id (str): The ID of the graph to query.
+            chat_data (ChatRequest): The chat data containing user queries and context.
     """
     graph_id = _graph_name(request, graph_id)
 

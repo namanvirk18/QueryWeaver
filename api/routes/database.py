@@ -21,7 +21,7 @@ class DatabaseConnectionRequest(BaseModel):
     url: str
 
 
-@database_router.post("/database")
+@database_router.post("/database", operation_id="connect_database")
 @token_required
 async def connect_database(request: Request, db_request: DatabaseConnectionRequest):
     """
