@@ -343,7 +343,7 @@ def _get_unique_tables(tables_list):
                 table_info[3] = [dict(od) for od in table_info[3]]
                 table_info[2] = "Foreign keys: " + table_info[2]
                 unique_tables[table_name] = table_info
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"Error: {table_info}, Exception: {e}")
 
     # Return the values (the unique table info lists)

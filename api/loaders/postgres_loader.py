@@ -9,10 +9,18 @@ from typing import AsyncGenerator, Tuple, Dict, Any, List
 import psycopg2
 import tqdm
 
-from api.loaders.base_loader import BaseLoader
-from api.loaders.graph_loader import load_to_graph
+from api.loaders.base_loader import BaseLoader  # pylint: disable=import-error
+from api.loaders.graph_loader import load_to_graph  # pylint: disable=import-error
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+
+class PostgreSQLQueryError(Exception):
+    """Exception raised when PostgreSQL query execution fails."""
+
+
+class PostgreSQLConnectionError(Exception):
+    """Exception raised when PostgreSQL connection fails."""
 
 
 class PostgresLoader(BaseLoader):
@@ -58,10 +66,9 @@ class PostgresLoader(BaseLoader):
             return value.isoformat()
         if isinstance(value, decimal.Decimal):
             return float(value)
-        elif value is None:
+        if value is None:
             return None
-        else:
-            return value
+        return value
 
     @staticmethod
     async def load(prefix: str, connection_url: str) -> AsyncGenerator[tuple[bool, str], None]:
@@ -107,7 +114,7 @@ class PostgresLoader(BaseLoader):
 
         except psycopg2.Error as e:
             yield False, f"PostgreSQL connection error: {str(e)}"
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             yield False, f"Error loading PostgreSQL schema: {str(e)}"
 
     @staticmethod
@@ -383,7 +390,7 @@ class PostgresLoader(BaseLoader):
             logging.info("Schema modification detected. Refreshing graph schema for: %s", graph_id)
 
             # Import here to avoid circular imports
-            from api.extensions import db
+            from api.extensions import db  # pylint: disable=import-error,import-outside-toplevel
 
             # Clear existing graph data
             # Drop current graph before reloading
@@ -409,7 +416,7 @@ class PostgresLoader(BaseLoader):
             logging.error("Schema refresh failed for graph %s: %s", graph_id, message)
             return False, "Failed to reload schema"
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             # Log the error and return failure
             logging.error("Error refreshing graph schema: %s", str(e))
             error_msg = "Error refreshing graph schema"
@@ -484,11 +491,11 @@ class PostgresLoader(BaseLoader):
                 conn.rollback()
                 cursor.close()
                 conn.close()
-            raise Exception(f"PostgreSQL query execution error: {str(e)}")
+            raise PostgreSQLConnectionError(f"PostgreSQL query execution error: {str(e)}") from e
         except Exception as e:
             # Rollback in case of error
             if 'conn' in locals():
                 conn.rollback()
                 cursor.close()
                 conn.close()
-            raise Exception(f"Error executing SQL query: {str(e)}")
+            raise PostgreSQLQueryError(f"Error executing SQL query: {str(e)}") from e
