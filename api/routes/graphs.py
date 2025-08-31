@@ -490,9 +490,10 @@ What this will do:
                     # If schema was modified, refresh the graph using the appropriate loader
                     if is_schema_modifying:
                         step = {"type": "reasoning_step",
-                                "final_response": True,
-                               "message": ("Step 3: Schema change detected - "
-                                         "refreshing graph...")}
+                        step = {"type": "reasoning_step",
+                                "final_response": False,
+                                "message": ("Step 3: Schema change detected - "
+                                            "refreshing graph...")}
                         yield json.dumps(step) + MESSAGE_DELIMITER
 
                         refresh_result = await loader_class.refresh_graph_schema(
