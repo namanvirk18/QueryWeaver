@@ -416,7 +416,7 @@ class MemoryTool:
             print(f"Error searching database facts for {self.graph_id}: {e}")
             return ""
 
-    async def search_memories(self, query: str, user_limit: int = 5, database_limit: int = 10) -> Dict[str, Any]:
+    async def search_memories(self, query: str, user_limit: int = 5, database_limit: int = 10) -> str:
         """
         Run both user summary and database facts searches concurrently for better performance.
         Also builds a comprehensive memory context string for the analysis agent.
@@ -485,12 +485,7 @@ class MemoryTool:
                 
                 memory_context += "\n"
             
-            return {
-                "user_summary": user_summary,
-                "database_facts": database_facts,
-                "similar_queries": similar_queries,
-                "memory_context": memory_context
-            }
+            return memory_context
             
         except Exception as e:
             print(f"Error in concurrent memory search: {e}")
@@ -501,22 +496,26 @@ class MemoryTool:
                 "memory_context": ""
             }
 
-    async def clean_memory(self, days: int = 7) -> Dict[str, Any]:
+    async def clean_memory(self, size: int = 10000) -> int:
         """
+        Clean up the memory by removing old nodes.
+
         """
-        #TODO complete
         driver = self.graphiti_client.driver
-        query = """
+        query = f"""
                 MATCH (n)
-                WHERE count(n) > $min_val
-                WITH n ORDER BY n.timestamp) ASC
-                LIMIT $delete_val
-                DETACH DELETE n;
+                WHERE NOT (n:Entity AND n.name = 'User {self.user_id}')
+                WITH n ORDER BY n.timestamp ASC
+                SKIP {size}
+                DETACH DELETE n
                 """
+        try:
+            result, _, _ = await driver.execute_query(query)
 
-        # result, _, _ = await driver.execute_query(query)
-        # print("debug", result)
-
+            return len(result)
+        except Exception as e:
+            print(f"Error cleaning memory: {e}")
+            return 0
 
     async def summarize_conversation(self, conversation: Dict[str, Any]) -> Dict[str, Any]:
         """

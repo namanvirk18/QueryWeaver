@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from api.agents import AnalysisAgent, RelevancyAgent, ResponseFormatterAgent, FollowUpAgent
 from api.auth.user_management import token_required
+from api.config import Config
 from api.extensions import db
 from api.graph import find, get_db_description
 from api.loaders.csv_loader import CSVLoader
@@ -291,6 +292,17 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
     if len(queries_history) == 0:
         raise HTTPException(status_code=400, detail="Empty chat history")
 
+    # Truncate history to keep only the last N questions maximum (configured in Config)
+    if len(queries_history) > Config.SHORT_MEMORY_LENGTH:
+        queries_history = queries_history[-Config.SHORT_MEMORY_LENGTH:]
+        # Keep corresponding results (one less than queries since current query has no result yet)
+        if result_history and len(result_history) > 0:
+            max_results = Config.SHORT_MEMORY_LENGTH - 1
+            if max_results > 0:
+                result_history = result_history[-max_results:]
+            else:
+                result_history = []
+
     logging.info("User Query: %s", sanitize_query(queries_history[-1]))
 
     memory_tool_task = asyncio.create_task(MemoryTool.create(request.state.user_id, graph_id))
@@ -365,13 +377,10 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
             logging.info("Calling to analysis agent with query: %s",
                          sanitize_query(queries_history[-1]))
             memory_tool = await memory_tool_task
-            search_memories = await memory_tool.search_memories(
+            memory_context = await memory_tool.search_memories(
                 query=queries_history[-1]
             )
-            
-            # Extract the pre-built memory context from the search results
-            memory_context = search_memories.get("memory_context", "")
-            
+
             logging.info("Starting SQL generation with analysis agent")
             answer_an = agent_an.get_analysis(
                 queries_history[-1], result, db_description, instructions, memory_context
