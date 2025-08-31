@@ -16,8 +16,8 @@ class AnalysisAgent(BaseAgent):
         user_query: str,
         combined_tables: list,
         db_description: str,
-        instructions: str = None,
-        memory_context: str = None,
+        instructions: str | None = None,
+        memory_context: str | None = None,
     ) -> dict:
         """Get analysis of user query against database schema."""
         formatted_schema = self._format_schema(combined_tables)
@@ -157,7 +157,8 @@ class AnalysisAgent(BaseAgent):
         return fk_str
 
     def _build_prompt(
-        self, user_input: str, formatted_schema: str, db_description: str, instructions, memory_context: str = None
+        self, user_input: str, formatted_schema: str,
+        db_description: str, instructions, memory_context: str | None = None
     ) -> str:
         """
         Build the prompt for Claude to analyze the query.
@@ -172,7 +173,7 @@ class AnalysisAgent(BaseAgent):
         Returns:
             The formatted prompt for Claude
         """
-        
+
         # Include memory context in the prompt if available
         memory_section = ""
         if memory_context and memory_context.strip():
@@ -191,7 +192,7 @@ class AnalysisAgent(BaseAgent):
             6. Consider any patterns or preferences the user has shown in past interactions
             </memory_context>
             """
-        
+
         prompt = f"""
             You must strictly follow the instructions below. Deviations will result in a penalty to your confidence score.
 
