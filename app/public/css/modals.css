@@ -399,6 +399,43 @@
   overflow-x: auto;
 }
 
+/* Styles for incremental database connection steps shown in the connect modal */
+#db-connection-steps {
+  margin: 16px 24px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+#db-connection-steps-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.db-connection-step {
+  display: flex;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.db-connection-step .step-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.db-connection-step .step-icon.pending { color: #1f6feb; }
+.db-connection-step .step-icon.success { color: #16a34a; }
+.db-connection-step .step-icon.error { color: #dc2626; }
+
 .alert {
   padding: 1.5em;
   border-radius: 6px;
