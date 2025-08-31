@@ -57,6 +57,17 @@ export function setupDatabaseModal() {
     function addStep(text: string, status: 'pending' | 'success' | 'error' = 'pending') {
         const list = document.getElementById('db-connection-steps-list') as HTMLUListElement | null;
         if (!list) return;
+
+        // Mark the previous pending step as completed (✓) when adding a new step
+        const prevLi = list.lastElementChild as HTMLLIElement | null;
+        if (prevLi) {
+            const prevIcon = prevLi.querySelector('.step-icon') as HTMLElement | null;
+            if (prevIcon && prevIcon.classList.contains('pending')) {
+                prevIcon.className = 'step-icon success';
+                prevIcon.textContent = '✓';
+            }
+        }
+
         const li = document.createElement('li');
         li.className = 'db-connection-step';
 
@@ -166,8 +177,6 @@ export function setupDatabaseModal() {
                 if (obj.type === 'reasoning_step') {
                     // show incremental step
                     addStep(obj.message || 'Working...', 'pending');
-                    const connectText = connectBtn.querySelector('.db-modal-connect-text') as HTMLElement | null;
-                    if (connectText) connectText.textContent = obj.message || 'Processing...';
                 } else if (obj.type === 'final_result') {
                     // mark last step as success and finish
                     addStep(obj.message || 'Completed', obj.success ? 'success' : 'error');

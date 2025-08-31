@@ -44,12 +44,14 @@ async def connect_database(request: Request, db_request: DatabaseConnectionReque
 
     async def generate():
         overall_start = time.perf_counter()
+        steps_counter = 0
         try:
             # Step 1: Start
+            steps_counter += 1
             yield json.dumps(
                 {
                     "type": "reasoning_step",
-                    "message": "Step 1: Starting database connection",
+                    "message": f"Step {steps_counter}: Starting database connection",
                 }
             ) + MESSAGE_DELIMITER
 
@@ -67,18 +69,32 @@ async def connect_database(request: Request, db_request: DatabaseConnectionReque
                 ) + MESSAGE_DELIMITER
                 return
 
+            steps_counter += 1
             yield json.dumps(
                 {
                     "type": "reasoning_step",
-                    "message": f"Step 2: Detected database type: {db_type}. "
+                    "message": f"Step {steps_counter}: Detected database type: {db_type}. "
                                 "Attempting to load schema...",
                 }
             ) + MESSAGE_DELIMITER
 
             # Step 3: Attempt to load schema using the loader
+            success, result = [False, ""]
             try:
                 load_start = time.perf_counter()
-                success, result = await loader.load(request.state.user_id, url)
+                async for progress in loader.load(request.state.user_id, url):
+                    success, result = progress
+                    if success:
+                        steps_counter += 1
+                        yield json.dumps(
+                            {
+                                "type": "reasoning_step",
+                                "message": f"Step {steps_counter}: {result}",
+                            }
+                        ) + MESSAGE_DELIMITER
+                    else:
+                        break
+
                 load_elapsed = time.perf_counter() - load_start
                 logging.info(
                     "Database load attempt finished in %.2f seconds", load_elapsed
