@@ -315,8 +315,22 @@ async function deleteToken(tokenId: string): Promise<void> {
     }
 }
 
-function formatDate(timestamp: number): string {
-    const date = new Date(timestamp * 1000);
+function formatDate(timestamp: number | null | undefined): string {
+    if (!timestamp && timestamp !== 0) return '';
+
+    // Backend may return created_at in seconds (10 digits) or milliseconds (13 digits).
+    // Normalize to milliseconds for Date constructor.
+    let ms = Number(timestamp);
+    if (!isFinite(ms)) return '';
+
+    // If the value looks like seconds (less than 1e12), convert to ms.
+    // Current UNIX time in ms is ~1.7e12 (year 2024). Anything below 1e12 is almost certainly seconds.
+    if (ms > 0 && ms < 1e12) {
+        ms = ms * 1000;
+    }
+
+    const date = new Date(ms);
+    if (isNaN(date.getTime())) return '';
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
