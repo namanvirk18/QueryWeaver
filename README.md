@@ -1,7 +1,8 @@
 [![Try Free](https://img.shields.io/badge/Try%20Free-FalkorDB%20Cloud-FF8101?labelColor=FDE900&link=https://app.falkordb.cloud)](https://app.falkordb.cloud)
 [![Dockerhub](https://img.shields.io/docker/pulls/falkordb/queryweaver?label=Docker)](https://hub.docker.com/r/falkordb/queryweaver/)
 [![Discord](https://img.shields.io/discord/1146782921294884966?style=flat-square)](https://discord.com/invite/6M4QwDXn2w)
-[![Workflow](https://github.com/FalkorDB/QueryWeaver/actions/workflows/pylint.yml/badge.svg?branch=main)](https://github.com/FalkorDB/QueryWeaver/actions/workflows/pylint.yml)
+[![Tests](https://github.com/FalkorDB/QueryWeaver/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/FalkorDB/QueryWeaver/actions/workflows/tests.yml)
+[![Swagger UI](https://img.shields.io/badge/API-Swagger-11B48A?logo=swagger&logoColor=white)](https://app.queryweaver.ai/docs)
 
 # QueryWeaver
 
@@ -49,6 +50,173 @@ docker run -p 5000:5000 -it \
 ```
 
 For a full list of configuration options, consult `.env.example`.
+
+## MCP server: host or connect (optional)
+
+QueryWeaver includes optional support for the Model Context Protocol (MCP). You can either have QueryWeaver expose an MCP-compatible HTTP surface (so other services can call QueryWeaver as an MCP server), or configure QueryWeaver to call an external MCP server for model/context services.
+
+What QueryWeaver provides
+- The app registers MCP operations focused on Text2SQL flows:
+   - `list_databases`
+   - `connect_database`
+   - `database_schema`
+   - `query_database`
+
+- To disable the built-in MCP endpoints set `DISABLE_MCP=true` in your `.env` or environment (default: MCP enabled).
+- Configuration
+
+- `DISABLE_MCP` — disable QueryWeaver's built-in MCP HTTP surface. Set to `true` to disable. Default: `false` (MCP enabled).
+
+Examples
+
+Disable the built-in MCP when running with Docker:
+
+```bash
+docker run -p 5000:5000 -it --env DISABLE_MCP=true falkordb/queryweaver
+```
+Calling the built-in MCP endpoints (example)
+- The MCP surface is exposed as HTTP endpoints. 
+
+
+### Server Configuration
+
+Below is a minimal example `mcp.json` client configuration that targets a local QueryWeaver instance exposing the MCP HTTP surface at `/mcp`.
+
+```json
+{
+   "servers": {
+      "queryweaver": {
+         "type": "http",
+         "url": "http://127.0.0.1:5000/mcp",
+         "headers": {
+            "Authorization": "Bearer your_token_here"
+         }
+      }
+   },
+   "inputs": []
+}
+```
+
+## REST API 
+
+### API Documentation
+
+Swagger UI: https://app.queryweaver.ai/docs
+
+OpenAPI JSON: https://app.queryweaver.ai/openapi.json
+
+### Overview
+
+QueryWeaver exposes a small REST API for managing graphs (database schemas) and running Text2SQL queries. All endpoints that modify or access user-scoped data require authentication via a bearer token. In the browser the app uses session cookies and OAuth flows; for CLI and scripts you can use an API token (see `tokens` routes or the web UI to create one).
+
+Core endpoints
+- GET /graphs — list available graphs for the authenticated user
+- GET /graphs/{graph_id}/data — return nodes/links (tables, columns, foreign keys) for the graph
+- POST /graphs — upload or create a graph (JSON payload or file upload)
+- POST /graphs/{graph_id} — run a Text2SQL chat query against the named graph (streaming response)
+
+Authentication
+- Add an Authorization header: `Authorization: Bearer <API_TOKEN>`
+
+Examples
+
+1) List graphs (GET)
+
+curl example:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" \
+   https://app.queryweaver.ai/graphs
+```
+
+Python example:
+
+```python
+import requests
+resp = requests.get('https://app.queryweaver.ai/graphs', headers={'Authorization': f'Bearer {TOKEN}'})
+print(resp.json())
+```
+
+2) Get graph schema (GET)
+
+curl example:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" \
+   https://app.queryweaver.ai/graphs/my_database/data
+```
+
+Python example:
+
+```python
+resp = requests.get('https://app.queryweaver.ai/graphs/my_database/data', headers={'Authorization': f'Bearer {TOKEN}'})
+print(resp.json())
+```
+
+3) Load a graph (POST) — JSON payload
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+   -d '{"database": "my_database", "tables": [...]}' \
+   https://app.queryweaver.ai/graphs
+```
+
+Or upload a file (multipart/form-data):
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" -F "file=@schema.json" \
+   https://app.queryweaver.ai/graphs
+```
+
+4) Query a graph (POST) — run a chat-based Text2SQL request
+
+The `POST /graphs/{graph_id}` endpoint accepts a JSON body with at least a `chat` field (an array of messages). The endpoint streams processing steps and the final SQL back as server-sent-message chunks delimited by a special boundary used by the frontend. For simple scripting you can call it and read the final JSON object from the streamed messages.
+
+Example payload:
+
+```json
+{
+   "chat": ["How many users signed up last month?"],
+   "result": [],
+   "instructions": "Prefer PostgreSQL compatible SQL"
+}
+```
+
+curl example (simple, collects whole response):
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+   -d '{"chat": ["Count orders last week"]}' \
+   https://app.queryweaver.ai/graphs/my_database
+```
+
+Python example (stream-aware):
+
+```python
+import requests
+
+url = 'https://app.queryweaver.ai/graphs/my_database'
+headers = {'Authorization': f'Bearer {TOKEN}', 'Content-Type': 'application/json'}
+with requests.post(url, headers=headers, json={"chat": ["Count orders last week"]}, stream=True) as r:
+      # The server yields JSON objects delimited by a message boundary string
+      boundary = '|||FALKORDB_MESSAGE_BOUNDARY|||'
+      buffer = ''
+      for chunk in r.iter_content(decode_unicode=True, chunk_size=1024):
+            buffer += chunk
+            while boundary in buffer:
+                  part, buffer = buffer.split(boundary, 1)
+                  if not part.strip():
+                        continue
+                  obj = json.loads(part)
+                  print('STREAM:', obj)
+
+```
+
+Notes & tips
+- Graph IDs are namespaced per-user. When calling the API directly use the plain graph id (the server will namespace by the authenticated user). For uploaded files the `database` field determines the saved graph id.
+- The streaming response includes intermediate reasoning steps, follow-up questions (if the query is ambiguous or off-topic), and the final SQL. The frontend expects the boundary string `|||FALKORDB_MESSAGE_BOUNDARY|||` between messages.
+- For destructive SQL (INSERT/UPDATE/DELETE etc) the service will include a confirmation step in the stream; the frontend handles this flow. If you automate destructive operations, ensure you handle confirmation properly (see the `ConfirmRequest` model in the code).
+
 
 ## Development
 
@@ -121,51 +289,6 @@ QueryWeaver supports Google and GitHub OAuth. Create OAuth credentials for each 
 
 - Google: set authorized origin and callback `http://localhost:5000/login/google/authorized`
 - GitHub: set homepage and callback `http://localhost:5000/login/github/authorized`
-
-## MCP server: host or connect (optional)
-
-QueryWeaver includes optional support for the Model Context Protocol (MCP). You can either have QueryWeaver expose an MCP-compatible HTTP surface (so other services can call QueryWeaver as an MCP server), or configure QueryWeaver to call an external MCP server for model/context services.
-
-What QueryWeaver provides
-- The app registers MCP operations focused on Text2SQL flows:
-   - `list_databases`
-   - `connect_database`
-   - `database_schema`
-   - `query_database`
-
-- To disable the built-in MCP endpoints set `DISABLE_MCP=true` in your `.env` or environment (default: MCP enabled).
-- Configuration
-
-- `DISABLE_MCP` — disable QueryWeaver's built-in MCP HTTP surface. Set to `true` to disable. Default: `false` (MCP enabled).
-
-Examples
-
-Disable the built-in MCP when running with Docker:
-
-```bash
-docker run -p 5000:5000 -it --env DISABLE_MCP=true falkordb/queryweaver
-```
-Calling the built-in MCP endpoints (example)
-- The MCP surface is exposed as HTTP endpoints. 
-
-
-### Server Configuration
-Below is a minimal example `mcp.json` client configuration that targets a local QueryWeaver instance exposing the MCP HTTP surface at `/mcp`.
-
-```json
-{
-   "servers": {
-      "queryweaver": {
-         "type": "http",
-         "url": "http://127.0.0.1:5000/mcp",
-         "headers": {
-            "Authorization": "Bearer your_token_here"
-         }
-      }
-   },
-   "inputs": []
-}
-```
 
 ## Testing
 

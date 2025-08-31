@@ -58,3 +58,14 @@ QueryWeaver's
 dev
 FastAPI
 
+ai
+https
+queryweaver
+json
+JSON
+openapi
+OpenAPI
+CLI
+namespace
+namespaced
+
