@@ -150,7 +150,6 @@ async def google_authorized(request: Request) -> RedirectResponse:
         user_info = token.get("userinfo")
 
         if user_info:
-
             user_data = {
                 'id': user_info.get('id') or user_info.get('sub'),
                 'email': user_info.get('email'),
@@ -163,7 +162,7 @@ async def google_authorized(request: Request) -> RedirectResponse:
             if handler:
                 api_token = secrets.token_urlsafe(32)  # ~43 chars, hard to guess
 
-                # call the registered handler (await if async)
+                # Call the registered handler (await if async)
                 await handler('google', user_data, api_token)
 
                 redirect = RedirectResponse(url="/chat", status_code=302)
@@ -176,9 +175,16 @@ async def google_authorized(request: Request) -> RedirectResponse:
 
                 return redirect
 
+            # Handler not set - log and raise error to prevent silent failure
+            logging.error("Google OAuth callback handler not registered in app state")
+            raise HTTPException(status_code=500, detail="Authentication handler not configured")
+
+        # If we reach here, user_info was falsy
+        logging.warning("No user info received from Google OAuth")
         raise HTTPException(status_code=400, detail="Failed to get user info from Google")
 
     except Exception as e:
+        logging.error(f"Google OAuth authentication failed: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
 
 
@@ -232,10 +238,9 @@ async def github_authorized(request: Request) -> RedirectResponse:
                         break
 
         if user_info:
-
             user_data = {
                 'id': user_info.get('id'),
-                'email': user_info.get('email'),
+                'email': email,
                 'name': user_info.get('name'),
                 'picture': user_info.get('avatar_url'),
             }
@@ -243,10 +248,9 @@ async def github_authorized(request: Request) -> RedirectResponse:
             # Call the registered GitHub callback handler if it exists to store user data.
             handler = getattr(request.app.state, "callback_handler", None)
             if handler:
-
                 api_token = secrets.token_urlsafe(32)  # ~43 chars, hard to guess
 
-                # call the registered handler (await if async)
+                # Call the registered handler (await if async)
                 await handler('github', user_data, api_token)
 
                 redirect = RedirectResponse(url="/chat", status_code=302)
@@ -259,9 +263,16 @@ async def github_authorized(request: Request) -> RedirectResponse:
 
                 return redirect
 
+            # Handler not set - log and raise error to prevent silent failure
+            logging.error("GitHub OAuth callback handler not registered in app state")
+            raise HTTPException(status_code=500, detail="Authentication handler not configured")
+
+        # If we reach here, user_info was falsy
+        logging.warning("No user info received from GitHub OAuth")
         raise HTTPException(status_code=400, detail="Failed to get user info from Github")
 
     except Exception as e:
+        logging.error(f"GitHub OAuth authentication failed: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
 
 

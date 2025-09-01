@@ -3,6 +3,7 @@
  */
 
 import { DOM, state } from "./config";
+import { getSelectedGraph } from './graph_select';
 
 export function addMessage(
   message: string,
@@ -59,6 +60,7 @@ export function addMessage(
       messageDiv.className += " final-result-message";
       messageDiv.style.overflow = "auto";
       const table = document.createElement("table");
+      table.id = "query-final-result-table";
       const tableHeader = document.createElement("thead");
       const headerRow = document.createElement("tr");
       Object.keys(queryResult[0]).forEach((column: any) => {
@@ -178,17 +180,12 @@ export function initChat() {
     if (element) element.innerHTML = "";
   });
 
-  if (
-    DOM.graphSelect &&
-    DOM.graphSelect.options.length > 0 &&
-    (DOM.graphSelect.options[0].value || DOM.graphSelect.options.length)
-  ) {
-    addMessage("Hello! How can I help you today?");
-  } else {
-    addMessage(
-      "Hello! Please select a graph from the dropdown above, upload a schema or connect to a database to get started."
-    );
-  }
+    const selected = getSelectedGraph();
+    if (selected) {
+        addMessage('Hello! How can I help you today?');
+    } else {
+        addMessage('Hello! Please select a graph from the dropdown above, upload a schema or connect to a database to get started.');
+    }
 
   state.questions_history = [];
   state.result_history = [];
