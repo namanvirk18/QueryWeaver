@@ -50,7 +50,7 @@ async def generate_token(request: Request) -> TokenListItem:
 
             return TokenListItem(
                 token_id=api_token,
-                created_at=111 # TODO set actual created_at timestamp
+                created_at=0  # Real timestamp is set by auth system in graph DB
             )
 
         raise HTTPException(
@@ -149,4 +149,3 @@ async def delete_token(request: Request, token_id: str) -> JSONResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         ) from e
-

@@ -116,13 +116,13 @@ async def connect_database(request: Request, db_request: DatabaseConnectionReque
                     yield json.dumps(
                         {"type": "error", "message": "Failed to load database schema"}
                     ) + MESSAGE_DELIMITER
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logging.exception("Error while loading database schema: %s", str(e))
                 yield json.dumps(
                     {"type": "error", "message": "Error connecting to database"}
                 ) + MESSAGE_DELIMITER
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logging.exception("Unexpected error in connect_database stream: %s", str(e))
             yield json.dumps(
                 {"type": "error", "message": "Internal server error"}
