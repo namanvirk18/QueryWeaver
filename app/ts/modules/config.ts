@@ -60,6 +60,7 @@ export const DOM = {
     expInstructions: getElement<HTMLTextAreaElement | null>('instructions-textarea'),
     inputContainer: getElement<HTMLElement | null>('input-container'),
     graphSelect: getElement<HTMLSelectElement | null>('graph-select'),
+    graphSelectRefresh: getElement<HTMLButtonElement | null>('graph-select-refresh'),
     resetConfirmationModal: getElement<HTMLElement | null>('reset-confirmation-modal'),
     resetConfirmBtn: getElement<HTMLButtonElement | null>('reset-confirm-btn'),
     resetCancelBtn: getElement<HTMLButtonElement | null>('reset-cancel-btn')

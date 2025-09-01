@@ -144,6 +144,14 @@
   border-color: var(--text-secondary);
 }
 
+#graph-select-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: none;
+}
+
 #graph-select {
   height: 100%;
   padding: 8px 12px;

@@ -95,6 +95,17 @@ function setupEventListeners() {
         }
     });
 
+    DOM.graphSelectRefresh?.addEventListener('click', () => {
+        const selected = DOM.graphSelect?.value;
+        if (!selected) return;
+        fetch(`/graphs/${encodeURIComponent(selected)}/refresh`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    });
+
     DOM.fileUpload?.addEventListener('change', handleFileUpload);
     window.addEventListener('resize', handleWindowResize);
 }
