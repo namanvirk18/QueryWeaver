@@ -29,6 +29,27 @@ class PostgresLoader(BaseLoader):
     Loader for PostgreSQL databases that connects and extracts schema information.
     """
 
+    # DDL operations that modify database schema  # pylint: disable=duplicate-code
+    SCHEMA_MODIFYING_OPERATIONS = {
+        'CREATE', 'ALTER', 'DROP', 'RENAME', 'TRUNCATE'
+    }
+
+    # More specific patterns for schema-affecting operations
+    SCHEMA_PATTERNS = [  # pylint: disable=duplicate-code
+        r'^\s*CREATE\s+TABLE',
+        r'^\s*CREATE\s+INDEX',
+        r'^\s*CREATE\s+UNIQUE\s+INDEX',
+        r'^\s*ALTER\s+TABLE',
+        r'^\s*DROP\s+TABLE',
+        r'^\s*DROP\s+INDEX',
+        r'^\s*RENAME\s+TABLE',
+        r'^\s*TRUNCATE\s+TABLE',
+        r'^\s*CREATE\s+VIEW',
+        r'^\s*DROP\s+VIEW',
+        r'^\s*CREATE\s+SCHEMA',
+        r'^\s*DROP\s+SCHEMA',
+    ]
+
     @staticmethod
     def _execute_count_query(cursor, table_name: str, col_name: str) -> Tuple[int, int]:
         """

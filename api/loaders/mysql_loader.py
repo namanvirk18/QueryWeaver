@@ -30,10 +30,27 @@ class MySQLLoader(BaseLoader):
     Loader for MySQL databases that connects and extracts schema information.
     """
 
-    # Additional MySQL-specific schema patterns
-    MYSQL_SPECIFIC_PATTERNS = [
+    # DDL operations that modify database schema  # pylint: disable=duplicate-code
+    SCHEMA_MODIFYING_OPERATIONS = {
+        'CREATE', 'ALTER', 'DROP', 'RENAME', 'TRUNCATE'
+    }
+
+    # More specific patterns for schema-affecting operations
+    SCHEMA_PATTERNS = [  # pylint: disable=duplicate-code
+        r'^\s*CREATE\s+TABLE',
+        r'^\s*CREATE\s+INDEX',
+        r'^\s*CREATE\s+UNIQUE\s+INDEX',
+        r'^\s*ALTER\s+TABLE',
+        r'^\s*DROP\s+TABLE',
+        r'^\s*DROP\s+INDEX',
+        r'^\s*RENAME\s+TABLE',
+        r'^\s*TRUNCATE\s+TABLE',
+        r'^\s*CREATE\s+VIEW',
+        r'^\s*DROP\s+VIEW',
         r'^\s*CREATE\s+DATABASE',
         r'^\s*DROP\s+DATABASE',
+        r'^\s*CREATE\s+SCHEMA',
+        r'^\s*DROP\s+SCHEMA',
     ]
 
     @staticmethod
@@ -423,8 +440,7 @@ class MySQLLoader(BaseLoader):
         first_word = normalized_query.split()[0] if normalized_query.split() else ""
         if first_word in MySQLLoader.SCHEMA_MODIFYING_OPERATIONS:
             # Additional pattern matching for more precise detection
-            all_patterns = MySQLLoader.SCHEMA_PATTERNS + MySQLLoader.MYSQL_SPECIFIC_PATTERNS
-            for pattern in all_patterns:
+            for pattern in MySQLLoader.SCHEMA_PATTERNS:
                 if re.match(pattern, normalized_query, re.IGNORECASE):
                     return True, first_word
 

@@ -8,27 +8,6 @@ from api.config import Config
 class BaseLoader(ABC):
     """Abstract base class for data loaders."""
 
-    # DDL operations that modify database schema (common to both MySQL and PostgreSQL)
-    SCHEMA_MODIFYING_OPERATIONS = {
-        'CREATE', 'ALTER', 'DROP', 'RENAME', 'TRUNCATE'
-    }
-
-    # More specific patterns for schema-affecting operations (common patterns)
-    SCHEMA_PATTERNS = [
-        r'^\s*CREATE\s+TABLE',
-        r'^\s*CREATE\s+INDEX',
-        r'^\s*CREATE\s+UNIQUE\s+INDEX',
-        r'^\s*ALTER\s+TABLE',
-        r'^\s*DROP\s+TABLE',
-        r'^\s*DROP\s+INDEX',
-        r'^\s*RENAME\s+TABLE',
-        r'^\s*TRUNCATE\s+TABLE',
-        r'^\s*CREATE\s+VIEW',
-        r'^\s*DROP\s+VIEW',
-        r'^\s*CREATE\s+SCHEMA',
-        r'^\s*DROP\s+SCHEMA',
-    ]
-
     @staticmethod
     @abstractmethod
     async def load(_graph_id: str, _data) -> AsyncGenerator[tuple[bool, str], None]:
