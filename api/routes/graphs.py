@@ -15,11 +15,8 @@ from api.auth.user_management import token_required
 from api.config import Config
 from api.extensions import db
 from api.graph import find, get_db_description
-from api.loaders.csv_loader import CSVLoader
-from api.loaders.json_loader import JSONLoader
 from api.loaders.postgres_loader import PostgresLoader
 from api.loaders.mysql_loader import MySQLLoader
-from api.loaders.odata_loader import ODataLoader
 from api.memory.graphiti_tool import MemoryTool
 
 # Use the same delimiter as in the JavaScript
@@ -232,51 +229,26 @@ async def load_graph(request: Request, data: GraphData = None, file: UploadFile 
 
     # ✅ Handle JSON Payload
     if data:
-        if not hasattr(data, 'database') or not data.database:
-            raise HTTPException(status_code=400, detail="Invalid JSON data")
-
-        graph_id = f"{request.state.user_id}_{data.database}"
-        success, result = await JSONLoader.load(graph_id, data.dict())
-
+        raise HTTPException(status_code=501, detail="JSONLoader is not implemented yet")
     # ✅ Handle File Upload
     elif file:
-        content = await file.read()
         filename = file.filename
 
         # ✅ Check if file is JSON
         if filename.endswith(".json"):
-            try:
-                data = json.loads(content.decode("utf-8"))
-                graph_id = f"{request.state.user_id}_{data.get('database', '')}"
-                success, result = await JSONLoader.load(graph_id, data)
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="Invalid JSON file")
+            raise HTTPException(status_code=501, detail="JSONLoader is not implemented yet")
 
         # ✅ Check if file is XML
         elif filename.endswith(".xml"):
-            xml_data = content.decode("utf-8")
-            graph_id = f"{request.state.user_id}_{filename.replace('.xml', '')}"
-            success, result = await ODataLoader.load(graph_id, xml_data)
+            raise HTTPException(status_code=501, detail="ODataLoader is not implemented yet")
 
         # ✅ Check if file is csv
         elif filename.endswith(".csv"):
-            csv_data = content.decode("utf-8")
-            graph_id = f"{request.state.user_id}_{filename.replace('.csv', '')}"
-            success, result = await CSVLoader.load(graph_id, csv_data)
-
+            raise HTTPException(status_code=501, detail="CSVLoader is not implemented yet")
         else:
             raise HTTPException(status_code=415, detail="Unsupported file type")
     else:
         raise HTTPException(status_code=415, detail="Unsupported Content-Type")
-
-    # ✅ Return the final response
-    if success:
-        return JSONResponse(content={"message": "Graph loaded successfully", "graph_id": graph_id})
-
-    # Log detailed error but return generic message to user
-    logging.error("Graph loading failed: %s", str(result)[:100])
-    raise HTTPException(status_code=400, detail="Failed to load graph data")
-
 
 @graphs_router.post("/{graph_id}", operation_id="query_database")
 @token_required
