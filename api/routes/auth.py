@@ -48,24 +48,6 @@ def _get_provider_client(request: Request, provider: str):
         raise HTTPException(status_code=500, detail=f"OAuth provider {provider} not configured")
     return client
 
-@auth_router.get("/chat", name="auth.chat", response_class=HTMLResponse)
-async def chat(request: Request) -> HTMLResponse:
-    """Explicit chat route (renders main chat UI)."""
-    user_info, is_authenticated = await validate_user(request)
-
-    if not is_authenticated or not user_info:
-        is_authenticated = False
-        user_info = None
-
-    return templates.TemplateResponse(
-        "chat.j2",
-        {
-            "request": request,
-            "is_authenticated": is_authenticated,
-            "user_info": user_info,
-        },
-    )
-
 def _build_callback_url(request: Request, path: str) -> str:
     """Build absolute callback URL, honoring OAUTH_BASE_URL if provided."""
     base_override = os.getenv("OAUTH_BASE_URL")
@@ -79,23 +61,12 @@ def _build_callback_url(request: Request, path: str) -> str:
 async def home(request: Request) -> HTMLResponse:
     """Handle the home page, rendering the landing page for unauthenticated users and the chat page for authenticated users."""
     user_info, is_authenticated_flag = await validate_user(request)
-
-    if is_authenticated_flag or user_info:
-        return templates.TemplateResponse(
-            "chat.j2",
-            {
-                "request": request,
-                "is_authenticated": True,
-                "user_info": user_info
-            }
-        )
-
     return templates.TemplateResponse(
-        "landing.j2", 
+        "chat.j2",
         {
-            "request": request, 
-            "is_authenticated": False, 
-            "user_info": None
+            "request": request,
+            "is_authenticated": is_authenticated_flag,
+            "user_info": user_info
         }
     )
 
@@ -166,7 +137,7 @@ async def google_authorized(request: Request) -> RedirectResponse:
                 # Call the registered handler (await if async)
                 await handler('google', user_data, api_token)
 
-                redirect = RedirectResponse(url="/chat", status_code=302)
+                redirect = RedirectResponse(url="/", status_code=302)
                 redirect.set_cookie(
                     key="api_token",
                     value=api_token,
@@ -254,7 +225,7 @@ async def github_authorized(request: Request) -> RedirectResponse:
                 # Call the registered handler (await if async)
                 await handler('github', user_data, api_token)
 
-                redirect = RedirectResponse(url="/chat", status_code=302)
+                redirect = RedirectResponse(url="/", status_code=302)
                 redirect.set_cookie(
                     key="api_token",
                     value=api_token,
