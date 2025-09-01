@@ -7,7 +7,7 @@ name: Build and deploy Python app to Azure Web App - queryweaver
 on:
   push:
     branches:
-      - main
+      - staging
   workflow_dispatch:
 
 jobs:
@@ -79,15 +79,15 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_5A92CE0E3729470284DEBEC07BD71572 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_1EB63FFB73BB453DA5FC60781960C9E5 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_5288D7A76CF3435AAEF4F034A1024F79 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_95C84156557F40AF875812F7C29CD989 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B26FFD333BD44EE98C7ACED0A22637B7 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_DEEC4D371D1547A6A3F63C9FE22DF791 }}
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
           app-name: 'queryweaver'
-          slot-name: 'production'
+          slot-name: 'staging'
           startup-command: 'python -m uvicorn api.index:app --host 0.0.0.0 --port $PORT'
 
