@@ -46,7 +46,7 @@ export function loadGraphs() {
                 if (DOM.submitButton) DOM.submitButton.disabled = true;
                 if (DOM.messageInput) DOM.messageInput.placeholder = 'Please upload a schema or connect a database to start chatting';
 
-                addMessage('No graphs are available. Please upload a schema file or connect to a database to get started.', false);
+                addMessage('No graphs are available. Please upload a schema file or connect to a database to get started.');
                 return;
             }
 
@@ -66,9 +66,9 @@ export function loadGraphs() {
             console.error('Error fetching graphs:', error);
 
             if ((error as Error).message.includes('Authentication required')) {
-                addMessage('Authentication required. Please log in to access your graphs.', false);
+                addMessage('Authentication required. Please log in to access your graphs.');
             } else {
-                addMessage('Sorry, there was an error fetching the available graphs: ' + (error as Error).message, false);
+                addMessage('Sorry, there was an error fetching the available graphs: ' + (error as Error).message);
                 if (DOM.messageInput) DOM.messageInput.disabled = true;
                 if (DOM.submitButton) DOM.submitButton.disabled = true;
                 if (DOM.messageInput) DOM.messageInput.placeholder = 'Cannot connect to server';
@@ -99,7 +99,7 @@ export function handleFileUpload(event: Event) {
         console.log('File uploaded successfully', data);
       }).catch(error => {
         console.error('Error uploading file:', error);
-        addMessage('Sorry, there was an error uploading your file: ' + (error as Error).message, false);
+        addMessage('Sorry, there was an error uploading your file: ' + (error as Error).message);
       });
 }
 

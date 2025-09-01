@@ -11,7 +11,7 @@ export async function sendMessage() {
 
     const selectedValue = DOM.graphSelect?.value || '';
     if (!selectedValue) {
-        addMessage('Please select a graph from the dropdown before sending a message.', false, true);
+        addMessage('Please select a graph from the dropdown before sending a message.', "followup");
         return;
     }
 
@@ -19,7 +19,7 @@ export async function sendMessage() {
         state.currentRequestController.abort();
     }
 
-    addMessage(message, true, false, false, false, (window as any).currentUser || null);
+    addMessage(message, "user", (window as any).currentUser || null);
     if (DOM.messageInput) DOM.messageInput.value = '';
 
     // Show typing indicator
@@ -27,7 +27,7 @@ export async function sendMessage() {
     if (DOM.submitButton) DOM.submitButton.style.display = 'none';
     if (DOM.pauseButton) DOM.pauseButton.style.display = 'block';
     if (DOM.newChatButton) DOM.newChatButton.disabled = true;
-    addMessage('', false, false, false, true);
+    addMessage('', "loading");
 
     [DOM.confValue, DOM.expValue, DOM.missValue, DOM.ambValue].forEach((element) => {
         if (element) element.innerHTML = '';
@@ -61,7 +61,7 @@ export async function sendMessage() {
         } else {
             console.error('Error:', error);
             resetUIState();
-            addMessage('Sorry, there was an error processing your message: ' + (error.message || String(error)), false);
+            addMessage('Sorry, there was an error processing your message: ' + (error.message || String(error)));
         }
         state.currentRequestController = null;
     }
@@ -79,9 +79,9 @@ async function processStreamingResponse(response: Response) {
             if (buffer.trim()) {
                 try {
                     const step = JSON.parse(buffer);
-                    addMessage(step.message || JSON.stringify(step), false);
+                    addMessage(step.message || JSON.stringify(step));
                 } catch {
-                    addMessage(buffer, false);
+                    addMessage(buffer);
                 }
             }
             break;
@@ -101,7 +101,7 @@ async function processStreamingResponse(response: Response) {
                 const step = JSON.parse(message);
                 handleStreamMessage(step);
             } catch {
-                addMessage('Failed: ' + message, false);
+                addMessage('Failed: ' + message);
             }
         }
     }
@@ -109,7 +109,7 @@ async function processStreamingResponse(response: Response) {
 
 function handleStreamMessage(step: any) {
     if (step.type === 'reasoning_step') {
-        addMessage(step.message, false);
+        addMessage(step.message);
         moveLoadingMessageToBottom();
     } else if (step.type === 'final_result') {
         handleFinalResult(step);
@@ -118,13 +118,13 @@ function handleStreamMessage(step: any) {
     } else if (step.type === 'query_result') {
         handleQueryResult(step);
     } else if (step.type === 'ai_response') {
-        addMessage(step.message, false, false, true);
+        addMessage(step.message, "final-result");
     } else if (step.type === 'destructive_confirmation') {
         addDestructiveConfirmationMessage(step);
     } else if (step.type === 'operation_cancelled') {
-        addMessage(step.message, false, true);
+        addMessage(step.message, "followup");
     } else {
-        addMessage(step.message || JSON.stringify(step), false);
+        addMessage(step.message || JSON.stringify(step));
     }
 
     if (step.type !== 'reasoning_step') {
@@ -160,9 +160,9 @@ function handleFinalResult(step: any) {
 
     const message = step.message || JSON.stringify(step.data, null, 2);
     if (step.is_valid) {
-        addMessage(message, false, false, true);
+        addMessage(message, "final-result");
     } else {
-        addMessage("Sorry, we couldn't generate a valid SQL query. Please try rephrasing your question or add more details. For help, check the explanation window.", false, true);
+        addMessage("Sorry, we couldn't generate a valid SQL query. Please try rephrasing your question or add more details. For help, check the explanation window.", "followup");
     }
 }
 
@@ -171,14 +171,15 @@ function handleFollowupQuestions(step: any) {
     if (DOM.confValue) DOM.confValue.textContent = 'N/A';
     if (DOM.missValue) DOM.missValue.textContent = 'N/A';
     if (DOM.ambValue) DOM.ambValue.textContent = 'N/A';
-    addMessage(step.message, false, true);
+    addMessage(step.message, "followup");
 }
 
 function handleQueryResult(step: any) {
     if (step.data) {
-        addMessage(`Query Result: ${JSON.stringify(step.data)}`, false, false, true);
+        console.log(step.data);
+        addMessage("Query Result", "query-final-result", null, step.data);
     } else {
-        addMessage('No results found for the query.', false);
+        addMessage('No results found for the query.');
     }
 }
 
@@ -196,7 +197,7 @@ export function pauseRequest() {
         state.currentRequestController = null;
 
         resetUIState();
-        addMessage('Request was paused by user.', false, true);
+        addMessage('Request was paused by user.', "followup");
     }
 }
 
@@ -249,10 +250,10 @@ export async function handleDestructiveConfirmation(confirmation: string, sqlQue
     if (DOM.messageInput) DOM.messageInput.disabled = false;
     if (DOM.submitButton) DOM.submitButton.disabled = false;
 
-    addMessage(`User choice: ${confirmation}`, true, false, false, false, (window as any).currentUser || null);
+    addMessage(`User choice: ${confirmation}`, "user", (window as any).currentUser || null);
 
     if (confirmation === 'CANCEL') {
-        addMessage('Operation cancelled. The destructive SQL query was not executed.', false, true);
+        addMessage('Operation cancelled. The destructive SQL query was not executed.', "followup");
         return;
     }
 
@@ -276,7 +277,7 @@ export async function handleDestructiveConfirmation(confirmation: string, sqlQue
         await processStreamingResponse(response);
     } catch (error: any) {
         console.error('Error:', error);
-        addMessage('Sorry, there was an error processing the confirmation: ' + (error.message || String(error)), false);
+        addMessage('Sorry, there was an error processing the confirmation: ' + (error.message || String(error)));
     }
 }
 
