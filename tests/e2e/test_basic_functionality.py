@@ -42,8 +42,9 @@ class TestBasicFunctionality:
 
         page = page_with_base_url
 
-        # If login button is present, test navigation
-        if page.query_selector(home_page.LOGIN_BUTTON):
+        # Check if login button is present and visible
+        login_button = page.query_selector(home_page.LOGIN_BUTTON)
+        if login_button and login_button.is_visible():
             # Click login should navigate to OAuth page or show login options
             home_page.click_login()
 
@@ -51,6 +52,11 @@ class TestBasicFunctionality:
             # We can't test actual OAuth but can verify redirection happens
             current_url = page.url
             assert "login" in current_url or "oauth" in current_url or "auth" in current_url
+        else:
+            # If no visible login button, user might already be authenticated
+            # or login functionality is handled differently
+            # Just verify the page loaded successfully
+            assert "QueryWeaver" in page.title() or page.url.endswith("/chat")
 
     def test_file_upload_interface(self, page_with_base_url):
         """Test file upload interface elements."""

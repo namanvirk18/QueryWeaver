@@ -32,6 +32,8 @@ class HomePage(BasePage):
 
     def click_login(self):
         """Click the login button."""
+        # Wait for the login button to be visible before clicking
+        self.page.wait_for_selector(self.LOGIN_BUTTON, state="visible", timeout=5000)
         self.page.click(self.LOGIN_BUTTON)
 
     def has_chat_interface(self):
