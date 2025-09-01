@@ -43,9 +43,9 @@ class ChatRequest(BaseModel):
     Args:
         BaseModel (_type_): _description_
     """
-    chat: list
-    result: list = None
-    instructions: str = None
+    chat: list[str]
+    result: list[str] | None = None
+    instructions: str | None = None
 
 
 class ConfirmRequest(BaseModel):
@@ -107,11 +107,11 @@ def _graph_name(request: Request, graph_id:str) -> str:
 
     return f"{request.state.user_id}_{graph_id}"
 
-@graphs_router.get("")
+@graphs_router.get("", operation_id="list_databases")
 @token_required
 async def list_graphs(request: Request):
     """
-    This route is used to list all the graphs that are available in the database.
+    This route is used to list all the graphs (databases names) that are available in the database.
     """
     user_id = request.state.user_id
     user_graphs = await db.list_graphs()
@@ -120,15 +120,17 @@ async def list_graphs(request: Request):
                        for graph in user_graphs if graph.startswith(f"{user_id}_")]
     return JSONResponse(content=filtered_graphs)
 
-
-@graphs_router.get("/{graph_id}/data")
+@graphs_router.get("/{graph_id}/data", operation_id="database_schema")
 @token_required
 async def get_graph_data(request: Request, graph_id: str):
-    """Return all nodes and edges for the specified graph (namespaced to the user).
+    """Return all nodes and edges for the specified database schema (namespaced to the user).
 
     This endpoint returns a JSON object with two keys: `nodes` and `edges`.
     Nodes contain a minimal set of properties (id, name, labels, props).
     Edges contain source and target node names (or internal ids), type and props.
+    
+        args:
+            graph_id (str): The ID of the graph to query (the database name).
     """
     namespaced = _graph_name(request, graph_id)
     try:
@@ -276,11 +278,15 @@ async def load_graph(request: Request, data: GraphData = None, file: UploadFile 
     raise HTTPException(status_code=400, detail="Failed to load graph data")
 
 
-@graphs_router.post("/{graph_id}")
+@graphs_router.post("/{graph_id}", operation_id="query_database")
 @token_required
 async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
     """
-    text2sql
+    Query the Database with the given graph_id and chat_data.
+    
+        Args:
+            graph_id (str): The ID of the graph to query.
+            chat_data (ChatRequest): The chat data containing user queries and context.
     """
     graph_id = _graph_name(request, graph_id)
 
@@ -407,7 +413,7 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):
                 }
             ) + MESSAGE_DELIMITER
 
-            # If the SQL query is valid, execute it using the postgress database db_url
+            # If the SQL query is valid, execute it using the postgres database db_url
             if answer_an["is_sql_translatable"]:
                 # Check if this is a destructive operation that requires confirmation
                 sql_query = answer_an["sql_query"]
@@ -469,7 +475,9 @@ What this will do:
                     return  # Stop here and wait for user confirmation
 
                 try:
-                    step = {"type": "reasoning_step", "final_response": False, "message": "Step 2: Executing SQL query"}
+                    step = {"type": "reasoning_step",
+                            "final_response": False,
+                            "message": "Step 2: Executing SQL query"}
                     yield json.dumps(step) + MESSAGE_DELIMITER
 
                     # Check if this query modifies the database schema using the appropriate loader
@@ -600,7 +608,7 @@ What this will do:
                 "generated_sql": answer_an.get('sql_query', ""),
                 "answer": final_answer
             }
-            
+
             # Add error information if SQL execution failed
             if execution_error:
                 full_response["error"] = execution_error
@@ -608,7 +616,7 @@ What this will do:
             else:
                 full_response["success"] = True
 
-            
+
             # Save query to memory
             save_query_task = asyncio.create_task(
                 memory_tool.save_query_memory(
@@ -622,13 +630,13 @@ What this will do:
                 lambda t: logging.error(f"Query memory save failed: {t.exception()}") 
                 if t.exception() else logging.info("Query memory saved successfully")
             )
-            
+
             # Save conversation with memory tool (run in background)
             save_task = asyncio.create_task(memory_tool.add_new_memory(full_response))
             # Add error handling callback to prevent silent failures
             save_task.add_done_callback(lambda t: logging.error(f"Memory save failed: {t.exception()}") if t.exception() else logging.info("Conversation saved to memory tool"))
             logging.info("Conversation save task started in background")
-            
+
             # Clean old memory in background (once per week cleanup)
             clean_memory_task = asyncio.create_task(memory_tool.clean_memory())
             clean_memory_task.add_done_callback(
@@ -672,7 +680,7 @@ async def confirm_destructive_operation(
     async def generate_confirmation():
         # Create memory tool for saving query results
         memory_tool = await MemoryTool.create(request.state.user_id, graph_id)
-        
+
         if confirmation == "CONFIRM":
             try:
                 db_description, db_url = await get_db_description(graph_id)
@@ -770,7 +778,7 @@ async def confirm_destructive_operation(
 
             except Exception as e:
                 logging.error("Error executing confirmed SQL query: %s", str(e))
-                
+
                 # Save failed confirmed query to memory
                 save_query_task = asyncio.create_task(
                     memory_tool.save_query_memory(
@@ -784,7 +792,7 @@ async def confirm_destructive_operation(
                     lambda t: logging.error(f"Failed confirmed query memory save failed: {t.exception()}") 
                     if t.exception() else logging.info("Failed confirmed query memory saved successfully")
                 )
-                
+
                 yield json.dumps(
                     {"type": "error", "message": "Error executing query"}
                 ) + MESSAGE_DELIMITER

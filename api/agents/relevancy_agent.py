@@ -70,6 +70,16 @@ class RelevancyAgent(BaseAgent):
     # pylint: disable=too-few-public-methods
     """Agent for determining relevancy of queries to database schema."""
 
+    def __init__(self, queries_history: list[str], result_history: list[str]):
+        """Initialize the relevancy agent with query and result history."""
+        if result_history is None:
+            self.messages = []
+        else:
+            self.messages = []
+            for query, result in zip(queries_history[:-1], result_history):
+                self.messages.append({"role": "user", "content": query})
+                self.messages.append({"role": "assistant", "content": result})
+
     async def get_answer(self, user_question: str, database_desc: dict) -> dict:
         """Get relevancy assessment for user question against database description."""
         self.messages.append(

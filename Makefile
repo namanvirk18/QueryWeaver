@@ -8,7 +8,7 @@ help: ## Show this help message
 
 install: ## Install dependencies
 	pipenv sync --dev
-	npm install ./app
+	npm install --prefix ./app
 
 
 setup-dev: install ## Set up development environment

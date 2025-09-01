@@ -1,18 +1,27 @@
 """PostgreSQL loader for loading database schemas into FalkorDB graphs."""
 
+import re
 import datetime
 import decimal
 import logging
-import re
-from typing import Tuple, Dict, Any, List
+from typing import AsyncGenerator, Tuple, Dict, Any, List
 
 import psycopg2
+from psycopg2 import sql
 import tqdm
 
-from api.loaders.base_loader import BaseLoader
-from api.loaders.graph_loader import load_to_graph
+from api.loaders.base_loader import BaseLoader  # pylint: disable=import-error
+from api.loaders.graph_loader import load_to_graph  # pylint: disable=import-error
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+
+class PostgreSQLQueryError(Exception):
+    """Exception raised when PostgreSQL query execution fails."""
+
+
+class PostgreSQLConnectionError(Exception):
+    """Exception raised when PostgreSQL connection fails."""
 
 
 class PostgresLoader(BaseLoader):
@@ -42,6 +51,39 @@ class PostgresLoader(BaseLoader):
     ]
 
     @staticmethod
+    def _execute_count_query(cursor, table_name: str, col_name: str) -> Tuple[int, int]:
+        """
+        Execute query to get total count and distinct count for a column.
+        PostgreSQL implementation returning counts from tuple-style results.
+        """
+        query = sql.SQL("""
+            SELECT COUNT(*) AS total_count,
+                   COUNT(DISTINCT {col}) AS distinct_count
+            FROM {table};
+        """).format(
+            col=sql.Identifier(col_name),
+            table=sql.Identifier(table_name)
+        )
+        cursor.execute(query)
+        output = cursor.fetchall()
+        first_result = output[0]
+        return first_result[0], first_result[1]
+
+    @staticmethod
+    def _execute_distinct_query(cursor, table_name: str, col_name: str) -> List[Any]:
+        """
+        Execute query to get distinct values for a column.
+        PostgreSQL implementation handling tuple-style results.
+        """
+        query = sql.SQL("SELECT DISTINCT {col} FROM {table};").format(
+            col=sql.Identifier(col_name),
+            table=sql.Identifier(table_name)
+        )
+        cursor.execute(query)
+        distinct_results = cursor.fetchall()
+        return [row[0] for row in distinct_results if row[0] is not None]
+
+    @staticmethod
     def _serialize_value(value):
         """
         Convert non-JSON serializable values to JSON serializable format.
@@ -58,13 +100,12 @@ class PostgresLoader(BaseLoader):
             return value.isoformat()
         if isinstance(value, decimal.Decimal):
             return float(value)
-        elif value is None:
+        if value is None:
             return None
-        else:
-            return value
+        return value
 
     @staticmethod
-    async def load(prefix: str, connection_url: str) -> Tuple[bool, str]:
+    async def load(prefix: str, connection_url: str) -> AsyncGenerator[tuple[bool, str], None]:
         """
         Load the graph data from a PostgreSQL database into the graph database.
 
@@ -86,8 +127,10 @@ class PostgresLoader(BaseLoader):
                 db_name = db_name.split('?')[0]
 
             # Get all table information
+            yield True, "Extracting table information..."
             entities = PostgresLoader.extract_tables_info(cursor)
 
+            yield True, "Extracting relationship information..."
             # Get all relationship information
             relationships = PostgresLoader.extract_relationships(cursor)
 
@@ -95,17 +138,20 @@ class PostgresLoader(BaseLoader):
             cursor.close()
             conn.close()
 
+            yield True, "Loading data into graph..."
             # Load data into graph
             await load_to_graph(f"{prefix}_{db_name}", entities, relationships,
                          db_name=db_name, db_url=connection_url)
 
-            return True, (f"PostgreSQL schema loaded successfully. "
+            yield True, (f"PostgreSQL schema loaded successfully. "
                          f"Found {len(entities)} tables.")
 
         except psycopg2.Error as e:
-            return False, f"PostgreSQL connection error: {str(e)}"
-        except Exception as e:
-            return False, f"Error loading PostgreSQL schema: {str(e)}"
+            logging.error("PostgreSQL connection error: %s", e)
+            raise PostgreSQLConnectionError(f"PostgreSQL connection error: {str(e)}") from e
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error("Error loading PostgreSQL schema: %s", e)
+            raise PostgreSQLConnectionError(f"Error loading PostgreSQL schema: {str(e)}") from e
 
     @staticmethod
     def extract_tables_info(cursor) -> Dict[str, Any]:
@@ -233,6 +279,12 @@ class PostgresLoader(BaseLoader):
             if column_default:
                 description_parts.append(f"(Default: {column_default})")
 
+            # Add distinct values if applicable
+            distinct_values_desc = PostgresLoader.extract_distinct_values_for_column(
+                cursor, table_name, col_name
+            )
+            description_parts.extend(distinct_values_desc)
+
             columns_info[col_name] = {
                 'type': data_type,
                 'null': is_nullable,
@@ -240,6 +292,7 @@ class PostgresLoader(BaseLoader):
                 'description': ' '.join(description_parts),
                 'default': column_default
             }
+
 
         return columns_info
 
@@ -380,7 +433,7 @@ class PostgresLoader(BaseLoader):
             logging.info("Schema modification detected. Refreshing graph schema for: %s", graph_id)
 
             # Import here to avoid circular imports
-            from api.extensions import db
+            from api.extensions import db  # pylint: disable=import-error,import-outside-toplevel
 
             # Clear existing graph data
             # Drop current graph before reloading
@@ -406,7 +459,7 @@ class PostgresLoader(BaseLoader):
             logging.error("Schema refresh failed for graph %s: %s", graph_id, message)
             return False, "Failed to reload schema"
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             # Log the error and return failure
             logging.error("Error refreshing graph schema: %s", str(e))
             error_msg = "Error refreshing graph schema"
@@ -481,11 +534,11 @@ class PostgresLoader(BaseLoader):
                 conn.rollback()
                 cursor.close()
                 conn.close()
-            raise Exception(f"PostgreSQL query execution error: {str(e)}")
+            raise PostgreSQLConnectionError(f"PostgreSQL query execution error: {str(e)}") from e
         except Exception as e:
             # Rollback in case of error
             if 'conn' in locals():
                 conn.rollback()
                 cursor.close()
                 conn.close()
-            raise Exception(f"Error executing SQL query: {str(e)}")
+            raise PostgreSQLQueryError(f"Error executing SQL query: {str(e)}") from e
