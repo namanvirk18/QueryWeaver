@@ -190,18 +190,10 @@ export function handleWindowResize() {
 }
 
 export function setupCustomDropdown() {
-  const dropdown = document.getElementById("database-type-dropdown");
-  const selected = dropdown?.querySelector(
-    ".dropdown-selected"
-  ) as HTMLElement | null;
-  const options = dropdown?.querySelector(
-    ".dropdown-options"
-  ) as HTMLElement | null;
-  const hiddenInput = document.getElementById(
-    "database-type-select"
-  ) as HTMLInputElement | null;
-
-  if (!dropdown || !selected || !options || !hiddenInput) return;
+    const dropdown = document.getElementById('database-type-dropdown') as HTMLElement;
+    const selected = dropdown?.querySelector('.dropdown-selected') as HTMLElement;
+    const options = dropdown?.querySelector('.dropdown-options') as HTMLElement;
+    const hiddenInput = document.getElementById('database-type-select') as HTMLInputElement;
 
   selected.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -209,11 +201,9 @@ export function setupCustomDropdown() {
     selected.classList.toggle("active");
   });
 
-  options.addEventListener("click", (e) => {
-    const option = (e.target as HTMLElement).closest(
-      ".dropdown-option"
-    ) as HTMLElement | null;
-    if (!option) return;
+    options.addEventListener('click', (e) => {
+        const option = (e.target as HTMLElement).closest('.dropdown-option') as HTMLElement;
+        if (!option) return;
 
     const value = option.dataset.value || "";
     const text = option.querySelector("span")?.textContent || "";

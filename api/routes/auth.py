@@ -99,10 +99,6 @@ async def home(request: Request) -> HTMLResponse:
         }
     )
 
-
-
-
-
 @auth_router.get("/login", response_class=RedirectResponse)
 async def login_page(_: Request) -> RedirectResponse:
     return RedirectResponse(url="/login/google", status_code=status.HTTP_302_FOUND)
@@ -147,7 +143,12 @@ async def google_authorized(request: Request) -> RedirectResponse:
     try:
         google = _get_provider_client(request, "google")
         token = await google.authorize_access_token(request)
-        user_info = token.get("userinfo")
+        resp = await google.get("userinfo", token=token)
+        if resp.status_code != 200:
+            logging.warning("Failed to retrieve user info from Google")
+            raise HTTPException(status_code=400, detail="Failed to get user info from Google")
+
+        user_info = resp.json()
 
         if user_info:
             user_data = {
@@ -292,7 +293,7 @@ async def logout(request: Request) -> RedirectResponse:
     if api_token:
         resp.delete_cookie("api_token")
         await delete_user_token(api_token)
-
+        
     return resp
 
 # ---- Hook for app factory ----
@@ -312,6 +313,7 @@ def init_auth(app):
         client_id=google_client_id,
         client_secret=google_client_secret,
         server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        api_base_url="https://openidconnect.googleapis.com/v1/",
         client_kwargs={"scope": "openid email profile"},
     )
 

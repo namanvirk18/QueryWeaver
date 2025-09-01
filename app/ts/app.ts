@@ -20,6 +20,7 @@ import {
 } from './modules/ui';
 import { setupAuthenticationModal, setupDatabaseModal } from './modules/modals';
 import { resizeGraph, showGraph } from './modules/schema';
+import { setupTokenManagement } from './modules/tokens';
 import { initLeftToolbar } from './modules/left_toolbar';
 
 async function loadAndShowGraph(selected: string | undefined) {
@@ -106,6 +107,7 @@ function setupUIComponents() {
     setupThemeToggle();
     setupAuthenticationModal();
     setupDatabaseModal();
+    setupTokenManagement();
     setupToolbar();
     // initialize left toolbar behavior (burger, responsive default)
     initLeftToolbar();

@@ -16,8 +16,8 @@ class AnalysisAgent(BaseAgent):
         user_query: str,
         combined_tables: list,
         db_description: str,
-        instructions: str = None,
-        memory_context: str = None,
+        instructions: str | None = None,
+        memory_context: str | None = None,
     ) -> dict:
         """Get analysis of user query against database schema."""
         formatted_schema = self._format_schema(combined_tables)
@@ -62,48 +62,103 @@ class AnalysisAgent(BaseAgent):
         formatted_schema = []
 
         for table_info in schema_data:
-            table_name = table_info[0]
-            table_description = table_info[1]
-            foreign_keys = table_info[2]
-            columns = table_info[3]
-
-            # Format table header
-            table_str = f"Table: {table_name} - {table_description}\n"
-
-            # Format columns using the updated OrderedDict structure
-            for column in columns:
-                col_name = column.get("columnName", "")
-                col_type = column.get("dataType", None)
-                col_description = column.get("description", "")
-                col_key = column.get("keyType", None)
-                nullable = column.get("nullable", False)
-
-                key_info = (
-                    ", PRIMARY KEY"
-                    if col_key == "PRI"
-                    else ", FOREIGN KEY" if col_key == "FK" else ""
-                )
-                column_str = (f"  - {col_name} ({col_type},{key_info},{col_key},"
-                             f"{nullable}): {col_description}")
-                table_str += column_str + "\n"
-
-            # Format foreign keys
-            if isinstance(foreign_keys, dict) and foreign_keys:
-                table_str += "  Foreign Keys:\n"
-                for fk_name, fk_info in foreign_keys.items():
-                    column = fk_info.get("column", "")
-                    ref_table = fk_info.get("referenced_table", "")
-                    ref_column = fk_info.get("referenced_column", "")
-                    table_str += (
-                        f"  - {fk_name}: {column} references {ref_table}.{ref_column}\n"
-                    )
-
+            table_str = self._format_single_table(table_info)
             formatted_schema.append(table_str)
 
         return "\n".join(formatted_schema)
 
+    def _format_single_table(self, table_info: List) -> str:
+        """
+        Format a single table's information.
+
+        Args:
+            table_info: Table information in the structure 
+                       [name, description, foreign_keys, columns]
+
+        Returns:
+            Formatted table string
+        """
+        table_name = table_info[0]
+        table_description = table_info[1]
+        foreign_keys = table_info[2]
+        columns = table_info[3]
+
+        # Format table header
+        table_str = f"Table: {table_name} - {table_description}\n"
+
+        # Format columns
+        table_str += self._format_table_columns(columns)
+
+        # Format foreign keys
+        table_str += self._format_foreign_keys(foreign_keys)
+
+        return table_str
+
+    def _format_table_columns(self, columns: List) -> str:
+        """
+        Format table columns information.
+
+        Args:
+            columns: List of column dictionaries
+
+        Returns:
+            Formatted columns string
+        """
+        columns_str = ""
+        for column in columns:
+            column_str = self._format_single_column(column)
+            columns_str += column_str + "\n"
+        return columns_str
+
+    def _format_single_column(self, column: dict) -> str:
+        """
+        Format a single column's information.
+
+        Args:
+            column: Column dictionary with metadata
+
+        Returns:
+            Formatted column string
+        """
+        col_name = column.get("columnName", "")
+        col_type = column.get("dataType", None)
+        col_description = column.get("description", "")
+        col_key = column.get("keyType", None)
+        nullable = column.get("nullable", False)
+
+        key_info = (
+            ", PRIMARY KEY"
+            if col_key == "PRI"
+            else ", FOREIGN KEY" if col_key == "FK" else ""
+        )
+        return (f"  - {col_name} ({col_type},{key_info},{col_key},"
+               f"{nullable}): {col_description}")
+
+    def _format_foreign_keys(self, foreign_keys: dict) -> str:
+        """
+        Format foreign keys information.
+
+        Args:
+            foreign_keys: Dictionary of foreign key information
+
+        Returns:
+            Formatted foreign keys string
+        """
+        if not isinstance(foreign_keys, dict) or not foreign_keys:
+            return ""
+
+        fk_str = "  Foreign Keys:\n"
+        for fk_name, fk_info in foreign_keys.items():
+            column = fk_info.get("column", "")
+            ref_table = fk_info.get("referenced_table", "")
+            ref_column = fk_info.get("referenced_column", "")
+            fk_str += f"  - {fk_name}: {column} references {ref_table}.{ref_column}\n"
+
+        return fk_str
+
     def _build_prompt(
-        self, user_input: str, formatted_schema: str, db_description: str, instructions, memory_context: str = None
+        self, user_input: str, formatted_schema: str,
+        db_description: str, instructions, memory_context: str | None = None
     ) -> str:
         """
         Build the prompt for Claude to analyze the query.
@@ -118,7 +173,7 @@ class AnalysisAgent(BaseAgent):
         Returns:
             The formatted prompt for Claude
         """
-        
+
         # Include memory context in the prompt if available
         memory_section = ""
         if memory_context and memory_context.strip():
@@ -137,7 +192,7 @@ class AnalysisAgent(BaseAgent):
             6. Consider any patterns or preferences the user has shown in past interactions
             </memory_context>
             """
-        
+
         prompt = f"""
             You must strictly follow the instructions below. Deviations will result in a penalty to your confidence score.
 

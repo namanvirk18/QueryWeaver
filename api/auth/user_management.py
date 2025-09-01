@@ -2,7 +2,6 @@
 
 import base64
 import logging
-from math import log
 import os
 import secrets
 from functools import wraps
@@ -39,16 +38,17 @@ async def _get_user_info(api_token: str) -> Optional[Dict[str, Any]]:
             single_result = result.result_set[0]
             token_valid = single_result[3]
 
-            # TODO delete invalid token from DB
             if token_valid:
                 return {
                     "email": single_result[0],
                     "name": single_result[1],
                     "picture": single_result[2]
                 }
+            # Delete invalid/expired token from DB for cleanup
+            await delete_user_token(api_token)
 
         return None
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error("Error fetching user info: %s", e)
         return None
 
@@ -69,11 +69,18 @@ async def delete_user_token(api_token: str):
             "api_token": api_token,
         })
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error("Error deleting user token: %s", e)
 
 
-async def ensure_user_in_organizations(provider_user_id: str, email: str, name: str, provider: str, api_token: str, picture: str = None):
+async def ensure_user_in_organizations(  # pylint: disable=too-many-arguments
+    provider_user_id: str,
+    email: str,
+    name: str,
+    provider: str,
+    api_token: str,
+    picture: str = None
+):
     """
     Check if identity exists in Organizations graph, create if not.
     Creates separate Identity and User nodes with proper relationships.
@@ -81,113 +88,31 @@ async def ensure_user_in_organizations(provider_user_id: str, email: str, name: 
     Returns (is_new_user, user_info)
     """
     # Input validation
-    if not provider_user_id or not email or not provider:
-        logging.error("Missing required parameters: provider_user_id=%s, email=%s, provider=%s",
-                     provider_user_id, email, provider)
-        return False, None
-
-    # Validate email format (basic check)
-    if "@" not in email or "." not in email:
-        logging.error("Invalid email format: %s", email)
-        return False, None
-
-    # Validate provider is in allowed list
-    allowed_providers = ["google", "github"]
-    if provider not in allowed_providers:
-        logging.error("Invalid provider: %s", provider)
-        return False, None
+    validation_result = _validate_user_input(provider_user_id, email, provider)
+    if validation_result:
+        return validation_result
 
     try:
-        # Select the Organizations graph
         organizations_graph = db.select_graph("Organizations")
+        first_name, last_name = _extract_name_parts(name)
 
-        # Extract first and last name
-        name_parts = (name or "").split(" ", 1) if name else ["", ""]
-        first_name = name_parts[0] if len(name_parts) > 0 else ""
-        last_name = name_parts[1] if len(name_parts) > 1 else ""
+        merge_query = _build_user_merge_query()
+        query_params = _build_query_params(
+            provider, provider_user_id, email,
+            name=name, picture=picture, first_name=first_name,
+            last_name=last_name, api_token=api_token
+        )
 
-        # Use MERGE to handle all scenarios in a single atomic operation
-        merge_query = """
-        // First, ensure user exists (merge by email)
-        MERGE (user:User {email: $email})
-        ON CREATE SET
-            user.first_name = $first_name,
-            user.last_name = $last_name,
-            user.created_at = timestamp()
-
-        // Then, merge identity and link to user
-        MERGE (identity:Identity {provider: $provider, provider_user_id: $provider_user_id})
-        ON CREATE SET
-            identity.email = $email,
-            identity.name = $name,
-            identity.picture = $picture,
-            identity.created_at = timestamp(),
-            identity.last_login = timestamp()
-        ON MATCH SET
-            identity.email = $email,
-            identity.name = $name,
-            identity.picture = $picture,
-            identity.last_login = timestamp()
-
-        // Ensure relationship exists
-        MERGE (identity)-[:AUTHENTICATES]->(user)
-        
-        // Then, create a session linked to the Identity and store the API_Token
-        MERGE (token:Token {id: $api_token})
-        ON CREATE SET
-            token.created_at = timestamp(),
-            token.expires_at = timestamp() + 86400000  // 24h expiry
-        MERGE (identity)-[:HAS_TOKEN]->(token)
-
-        // Return results with flags to determine if this was a new user/identity
-        RETURN
-            identity,
-            user,
-            identity.created_at = identity.last_login AS is_new_identity,
-            EXISTS((user)<-[:AUTHENTICATES]-(:Identity)) AS had_other_identities
-        """
-
-        result = await organizations_graph.query(merge_query, {
-            "provider": provider,
-            "provider_user_id": provider_user_id,
-            "email": email,
-            "name": name,
-            "picture": picture,
-            "first_name": first_name,
-            "last_name": last_name,
-            "api_token": api_token
-        })
-
-        if result.result_set:
-            identity = result.result_set[0][0]
-            user = result.result_set[0][1]
-            is_new_identity = result.result_set[0][2]
-            had_other_identities = result.result_set[0][3]
-
-            # Determine the type of operation for logging
-            if is_new_identity and not had_other_identities:
-                # Brand new user (first identity)
-                logging.info("NEW USER CREATED: provider=%s, provider_user_id=%s, "
-                           "email=%s, name=%s", provider, provider_user_id, email, name)
-                return True, {"identity": identity, "user": user}
-            elif is_new_identity and had_other_identities:
-                # New identity for existing user (cross-provider linking)
-                logging.info("NEW IDENTITY LINKED TO EXISTING USER: provider=%s, "
-                           "provider_user_id=%s, email=%s, name=%s",
-                           provider, provider_user_id, email, name)
-                return True, {"identity": identity, "user": user}
-            else:
-                # Existing identity login
-                logging.info("Existing identity found: provider=%s, email=%s", provider, email)
-                return False, {"identity": identity, "user": user}
-        else:
-            logging.error("Failed to create/update identity and user: email=%s", email)
-            return False, None
+        result = await organizations_graph.query(merge_query, query_params)
+        return _process_user_result(result, provider, provider_user_id, email, name)
 
     except (AttributeError, ValueError, KeyError) as e:
         logging.error("Error managing user in Organizations graph: %s", e)
         return False, None
-    except Exception as e:
+    except (ConnectionError, TimeoutError) as e:
+        logging.error("Database connection error managing user in Organizations graph: %s", e)
+        return False, None
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error("Unexpected error managing user in Organizations graph: %s", e)
         return False, None
 
@@ -222,10 +147,40 @@ async def update_identity_last_login(provider, provider_user_id):
     except (AttributeError, ValueError, KeyError) as e:
         logging.error("Error updating last login for identity %s/%s: %s",
                      provider, provider_user_id, e)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error("Unexpected error updating last login for identity %s/%s: %s",
                      provider, provider_user_id, e)
 
+
+def get_token(request: Request)-> Optional[str]:
+    """
+    Extract the API token from the request.
+    """
+
+    # Check cookies
+    api_token = request.cookies.get("api_token")
+    if api_token:
+        return api_token
+
+    # Check query parameters
+    api_token = request.query_params.get("api_token")
+    if api_token:
+        return api_token
+
+    # Check Authorization header
+    auth_header = (
+        request.headers.get("authorization")
+        or request.headers.get("Authorization")
+    )
+    if auth_header:
+        try:
+            parts = auth_header.split(None, 1)
+            if len(parts) == 2 and parts[0].lower() == "bearer":
+                return parts[1].strip()
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+
+    return None
 
 async def validate_user(request: Request) -> Tuple[Optional[Dict[str, Any]], bool]:
     """
@@ -234,10 +189,7 @@ async def validate_user(request: Request) -> Tuple[Optional[Dict[str, Any]], boo
     Includes refresh handling for Google.
     """
     try:
-        # token might be in the URL if not in the cookie for API access
-        api_token = request.cookies.get("api_token")
-        if not api_token:
-            api_token = request.query_params.get("api_token")
+        api_token = get_token(request)
 
         if api_token:
             db_info = await _get_user_info(api_token)
@@ -247,13 +199,14 @@ async def validate_user(request: Request) -> Tuple[Optional[Dict[str, Any]], boo
 
         return None, False
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error("Unexpected error in validate_user: %s", e)
         return None, False
 
 def token_required(func):
     """Decorator to protect FastAPI routes with token authentication.
     Automatically refreshes tokens if expired.
+    Supports both OAuth and API token authentication.
     """
 
     @wraps(func)
@@ -262,18 +215,17 @@ def token_required(func):
             user_info, is_authenticated = await validate_user(request)
 
             if not is_authenticated:
-                # Second attempt after clearing session to force re-validation
-                user_info, is_authenticated = await validate_user(request)
-
-            if not is_authenticated:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Unauthorized - Please log in"
+                    detail="Unauthorized - Please log in or provide a valid API token"
                 )
 
             # Attach user_id to request.state (like FASTAPI's g.user_id)
             # we're using the email as BASE64 encoded
-            request.state.user_id = base64.b64encode(user_info.get("email").encode()).decode()
+            email = user_info.get("email")
+            request.state.user_id = base64.b64encode(email.encode()).decode()
+            request.state.user_email = email
+
             if not request.state.user_id:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -289,6 +241,131 @@ def token_required(func):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Unauthorized - Authentication error"
-            )
+            ) from e
 
     return wrapper
+
+
+def _validate_user_input(provider_user_id: str, email: str, provider: str):
+    """Validate input parameters for user creation/update."""
+    if not provider_user_id or not email or not provider:
+        logging.error("Missing required parameters: provider_user_id=%s, email=%s, provider=%s",
+                     provider_user_id, email, provider)
+        return False, None
+
+    # Validate email format (basic check)
+    if "@" not in email or "." not in email:
+        logging.error("Invalid email format: %s", email)
+        return False, None
+
+    # Validate provider is in allowed list
+    allowed_providers = ["google", "github", "api"]
+    if provider not in allowed_providers:
+        logging.error("Invalid provider: %s", provider)
+        return False, None
+
+    return None  # No validation errors
+
+
+def _extract_name_parts(name: str) -> tuple:
+    """Extract first and last name from full name."""
+    name_parts = (name or "").split(" ", 1) if name else ["", ""]
+    first_name = name_parts[0] if len(name_parts) > 0 else ""
+    last_name = name_parts[1] if len(name_parts) > 1 else ""
+    return first_name, last_name
+
+
+def _build_user_merge_query() -> str:
+    """Build the Cypher query for user/identity merge operations."""
+    return """
+        // First, ensure user exists (merge by email)
+        MERGE (user:User {email: $email})
+        ON CREATE SET
+            user.first_name = $first_name,
+            user.last_name = $last_name,
+            user.created_at = timestamp()
+
+        // Then, merge identity and link to user
+        MERGE (identity:Identity {provider: $provider, provider_user_id: $provider_user_id})
+        ON CREATE SET
+            identity.email = $email,
+            identity.name = $name,
+            identity.picture = $picture,
+            identity.created_at = timestamp(),
+            identity.last_login = timestamp()
+        ON MATCH SET
+            identity.email = $email,
+            identity.name = $name,
+            identity.picture = $picture,
+            identity.last_login = timestamp()
+
+        // Ensure relationship exists
+        MERGE (identity)-[:AUTHENTICATES]->(user)
+
+        // Then, create a session linked to the Identity and store the API_Token
+        MERGE (token:Token {id: $api_token})
+        ON CREATE SET
+            token.created_at = timestamp(),
+            token.expires_at = timestamp() + 86400000  // 24h expiry
+        MERGE (identity)-[:HAS_TOKEN]->(token)
+
+        // Return results with flags to determine if this was a new user/identity
+        RETURN
+            identity,
+            user,
+            identity.created_at = identity.last_login AS is_new_identity,
+            EXISTS((user)<-[:AUTHENTICATES]-(:Identity)) AS had_other_identities
+        """
+
+
+def _build_query_params(  # pylint: disable=too-many-arguments
+    provider: str,
+    provider_user_id: str,
+    email: str,
+    *,
+    name: str,
+    picture: str,
+    first_name: str,
+    last_name: str,
+    api_token: str
+) -> dict:
+    """Build query parameters for the database operation."""
+    return {
+        "provider": provider,
+        "provider_user_id": provider_user_id,
+        "email": email,
+        "name": name,
+        "picture": picture,
+        "first_name": first_name,
+        "last_name": last_name,
+        "api_token": api_token
+    }
+
+
+def _process_user_result(result, provider: str, provider_user_id: str,
+                        email: str, name: str):
+    """Process the database result and return appropriate response."""
+    if result.result_set:
+        identity = result.result_set[0][0]
+        user = result.result_set[0][1]
+        is_new_identity = result.result_set[0][2]
+        had_other_identities = result.result_set[0][3]
+
+        # Determine the type of operation for logging
+        if is_new_identity and not had_other_identities:
+            # Brand new user (first identity)
+            logging.info("NEW USER CREATED: provider=%s, provider_user_id=%s, "
+                       "email=%s, name=%s", provider, provider_user_id, email, name)
+            return True, {"identity": identity, "user": user}
+        if is_new_identity and had_other_identities:
+            # New identity for existing user (cross-provider linking)
+            logging.info("NEW IDENTITY LINKED TO EXISTING USER: provider=%s, "
+                       "provider_user_id=%s, email=%s, name=%s",
+                       provider, provider_user_id, email, name)
+            return True, {"identity": identity, "user": user}
+        # Existing identity login
+        logging.info("Existing identity found: provider=%s, email=%s", provider, email)
+        return False, {"identity": identity, "user": user}
+
+    logging.error("Failed to create/update identity and user: email=%s", email)
+    return False, None
