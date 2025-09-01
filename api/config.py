@@ -3,6 +3,7 @@
 This module contains the configuration for the text2sql module.
 """
 
+import os
 import dataclasses
 from typing import Union
 
@@ -49,19 +50,20 @@ class Config:
     """
     Configuration class for the text2sql module.
     """
+    AZURE_FLAG = True
+    if not os.getenv("OPENAI_API_KEY"):
+        EMBEDDING_MODEL_NAME = "azure/text-embedding-ada-002"
+        COMPLETION_MODEL = "azure/gpt-4.1"
+    else:
+        AZURE_FLAG = False
+        EMBEDDING_MODEL_NAME = "openai/text-embedding-ada-002"
+        COMPLETION_MODEL = "openai/gpt-4.1"
 
-    SCHEMA_PATH = "api/schema_schema.json"
-    EMBEDDING_MODEL_NAME = "azure/text-embedding-ada-002"
-    COMPLETION_MODEL = "azure/gpt-4.1"
-    VALIDATOR_MODEL = "azure/gpt-4.1"
-    TEMPERATURE = 0
     DB_MAX_DISTINCT: int = 100  # pylint: disable=invalid-name
     DB_UNIQUENESS_THRESHOLD: float = 0.5  # pylint: disable=invalid-name
     SHORT_MEMORY_LENGTH = 5  # Maximum number of questions to keep in short-term memory
-    config = {}
 
-
-    EMBEDDING_MODEL = EmbeddingsModel(model_name=EMBEDDING_MODEL_NAME, config=config)
+    EMBEDDING_MODEL = EmbeddingsModel(model_name=EMBEDDING_MODEL_NAME)
 
     FIND_SYSTEM_PROMPT = """
     You are an expert in analyzing natural language queries into SQL tables descriptions.
