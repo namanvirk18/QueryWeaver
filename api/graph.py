@@ -258,9 +258,11 @@ async def find(
     user_query = queries_history[-1]
     previous_queries = queries_history[:-1]
 
+    # Sanitize user_query to prevent log injection
+    sanitized_user_query = user_query.replace('\n', ' ').replace('\r', ' ') if user_query else 'Unknown query'
     logging.info(
         "Calling LLM to find relevant tables/columns for query: %s",
-        user_query
+        sanitized_user_query
     )
 
     completion_result = completion(

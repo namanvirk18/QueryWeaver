@@ -128,7 +128,9 @@ async def delete_token(request: Request, token_id: str) -> JSONResponse:
             "token_id": token_id
         })
 
-        logging.info("Token deleted for user %s: token_id=%s", user_email, token_id)  # nosemgrep
+        # Sanitize token_id to prevent log injection
+        sanitized_token_id = token_id.replace('\n', ' ').replace('\r', ' ') if token_id else 'Unknown'
+        logging.info("Token deleted for user %s: token_id=%s", user_email, sanitized_token_id)  # nosemgrep
 
         if result.result_set and result.result_set[0][0] > 0:
             return JSONResponse(
