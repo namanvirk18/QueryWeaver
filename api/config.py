@@ -57,13 +57,6 @@ class Config:
     TEMPERATURE = 0
     DB_MAX_DISTINCT: int = 100  # pylint: disable=invalid-name
     DB_UNIQUENESS_THRESHOLD: float = 0.5  # pylint: disable=invalid-name
-    # client = boto3.client('sts')
-    # AWS_PROFILE = os.getenv("aws_profile_name")
-    # AWS_REGION = os.getenv("aws_region_name")
-    # AWS_ROLE_ARN = os.getenv("AWS_ROLE_ARN")
-    # VERCEL_OIDC_TOKEN = os.getenv("VERCEL_OIDC_TOKEN")
-    # AWS_SECRET_TOKEN = os.getenv("SECRET_TOKEN")
-    # aws_session_name = "text2sql"
     SHORT_MEMORY_LENGTH = 5  # Maximum number of questions to keep in short-term memory
     config = {}
 
