@@ -816,7 +816,7 @@ async def refresh_graph_schema(request: Request, graph_id: str):
         raise
     except Exception as e:
         logging.error("Error in refresh_graph_schema: %s", str(e))
-        raise HTTPException(status_code=500, detail="Internal server error while refreshing schema")
+        raise HTTPException(status_code=500, detail="Internal server error while refreshing schema") # pylint: disable=raise-missing-from
 
 @graphs_router.delete("/{graph_id}")
 @token_required
