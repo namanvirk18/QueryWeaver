@@ -12,7 +12,8 @@ export function addMessage(
     isFollowup = false,
     isFinalResult = false,
     isLoading = false,
-    userInfo: { picture?: string; name?: string } | null = null
+    userInfo: { picture?: string; name?: string } | null = null,
+    isQuery = false,
 ) {
     const messageDiv = document.createElement('div');
     const messageDivContainer = document.createElement('div');
@@ -42,6 +43,7 @@ export function addMessage(
     } else if (isFinalResult) {
         messageDivContainer.className += ' final-result-message-container';
         messageDiv.className += ' final-result-message';
+        if (isQuery) messageDiv.classList.add('query-text');
     } else {
         messageDivContainer.className += ' bot-message-container';
         messageDiv.className += ' bot-message';

@@ -212,7 +212,6 @@
   max-height: calc(24px * 5);
   overflow-y: auto;
   line-height: 24px;
-  font-family: inherit;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }

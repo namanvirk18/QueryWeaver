@@ -11,17 +11,24 @@
   src: url('fonts/fira_code.ttf');
 }
 
+@font-face {
+  font-family: 'Inter';
+  src: url('fonts/inter.ttf');
+}
+
+* {
+  font-family: 'Inter' !important;
+}
+
+.query-text {
+  font-family: 'Fira Code' !important;
+}
+
 body {
-  font-family: 'Fira Code', monospace;
   background-color: var(--falkor-secondary);
   display: flex;
   flex-direction: column;
   color: var(--text-primary);
-}
-
-/* Ensure all form elements inherit the consistent font */
-button, input, select, textarea {
-  font-family: inherit;
 }
 
 /* Scrollbar Styles */

@@ -372,7 +372,7 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest): 
             logging.info("Generated SQL query: %s", answer_an['sql_query'])  # nosemgrep
             yield json.dumps(
                 {
-                    "type": "final_result",
+                    "type": "sql_query",
                     "data": answer_an["sql_query"],
                     "conf": answer_an["confidence"],
                     "miss": answer_an["missing_information"],
