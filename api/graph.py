@@ -258,10 +258,7 @@ async def find(
     user_query = queries_history[-1]
     previous_queries = queries_history[:-1]
 
-    logging.info(
-        "Calling LLM to find relevant tables/columns for query: %s",
-        user_query
-    )
+    logging.info("Calling LLM to find relevant tables/columns for query")
 
     completion_result = completion(
         model=Config.COMPLETION_MODEL,

@@ -463,7 +463,7 @@ class MySQLLoader(BaseLoader):
             Tuple of (success, message)
         """
         try:
-            logging.info("Schema modification detected. Refreshing graph schema for: %s", graph_id)
+            logging.info("Schema modification detected. Refreshing graph schema.")
 
             # Import here to avoid circular imports
             from api.extensions import db  # pylint: disable=import-error,import-outside-toplevel
@@ -489,7 +489,7 @@ class MySQLLoader(BaseLoader):
                 logging.info("Graph schema refreshed successfully.")
                 return True, message
 
-            logging.error("Schema refresh failed for graph %s: %s", graph_id, message)
+            logging.error("Schema refresh failed")
             return False, "Failed to reload schema"
 
         except Exception as e:  # pylint: disable=broad-exception-caught

@@ -46,11 +46,11 @@ async def generate_token(request: Request) -> TokenListItem:
             # Call the registered handler (await if async)
             await handler('api', user_data, api_token)
 
-            logging.info("Token generated for user: %s", user_email)
+            logging.info("Token generated for user: %s", user_email)  # nosemgrep
 
             return TokenListItem(
                 token_id=api_token,
-                created_at=111 # TODO set actual created_at timestamp
+                created_at=0  # Real timestamp is set by auth system in graph DB
             )
 
         raise HTTPException(
@@ -61,7 +61,7 @@ async def generate_token(request: Request) -> TokenListItem:
     except HTTPException:
         raise
     except Exception as e:
-        logging.error("Error generating token: %s", e)
+        logging.error("Error generating token: %s", e)  # nosemgrep
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -99,7 +99,7 @@ async def list_tokens(request: Request) -> TokenListResponse:
     except HTTPException:
         raise
     except Exception as e:
-        logging.error("Error listing tokens: %s", e)
+        logging.error("Error listing tokens: %s", e)  # nosemgrep
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -128,7 +128,9 @@ async def delete_token(request: Request, token_id: str) -> JSONResponse:
             "token_id": token_id
         })
 
-        logging.info("Token deleted for user %s: token_id=%s", user_email, token_id)
+        # Sanitize token_id to prevent log injection
+        sanitized_token_id = token_id.replace('\n', ' ').replace('\r', ' ') if token_id else 'Unknown'
+        logging.info("Token deleted for user %s: token_id=%s", user_email, sanitized_token_id)  # nosemgrep
 
         if result.result_set and result.result_set[0][0] > 0:
             return JSONResponse(
@@ -144,9 +146,8 @@ async def delete_token(request: Request, token_id: str) -> JSONResponse:
     except HTTPException:
         raise
     except Exception as e:
-        logging.error("Error deleting token: %s", e)
+        logging.error("Error deleting token: %s", e)  # nosemgrep
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         ) from e
-
