@@ -238,7 +238,7 @@ async def _find_connecting_tables(
     return result
 
 
-async def find(
+async def find( # pylint: disable=too-many-locals
     graph_id: str,
     queries_history: List[str],
     db_description: str = None

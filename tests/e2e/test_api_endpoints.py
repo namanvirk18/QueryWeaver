@@ -59,12 +59,12 @@ class TestAPIEndpoints:
         response = requests.post(app_url, timeout=10)
         assert response.status_code in [405, 200]  # Some frameworks handle this differently
 
-    def test_authenticated_endpoints(self, app_url):
+    def test_authenticated_endpoints(self, app_url): # pylint: disable=unused-argument
         """Test endpoints that require authentication."""
         # Skip this test since we don't have real authentication in E2E tests
         # Using hardcoded tokens is a security risk and doesn't test real auth
-        pytest.skip("Authenticated endpoints require real OAuth setup - not suitable for automated E2E testing")
-        
+        pytest.skip("Authenticated endpoints require real OAuth setup - not suitable for automated E2E testing") # pylint: disable=line-too-long
+
         # The following code is kept for reference but not executed:
         # headers = {"Authorization": "Bearer test-api-token-for-e2e-tests"}
         # response = requests.get(f"{app_url}/graphs", headers=headers, timeout=10)

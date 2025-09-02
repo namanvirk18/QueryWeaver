@@ -17,16 +17,16 @@ class TestBasicFunctionality:
         # Check that the page loaded successfully by verifying URL and basic structure
         current_url = page_with_base_url.url
         assert current_url.endswith("/"), f"Expected URL to end with '/', got: {current_url}"
-        
+
         # Check that the page has basic HTML structure
         body = page_with_base_url.query_selector("body")
         assert body is not None, "Page should have a body element"
-        
+
         # Wait a bit for any dynamic content to load
         page_with_base_url.wait_for_timeout(2000)
 
         # The page should have some interactive elements (login, chat, or other controls)
-        interactive_elements = page_with_base_url.query_selector_all("button, input, select, textarea, a[href]")
+        interactive_elements = page_with_base_url.query_selector_all("button, input, select, textarea, a[href]") # pylint: disable=line-too-long
         assert len(interactive_elements) > 0, "Page should have some interactive UI elements"
 
     def test_file_upload_interface(self, page_with_base_url):
@@ -38,16 +38,16 @@ class TestBasicFunctionality:
 
         # Check if file upload related elements exist in the UI
         # These might be hidden for unauthenticated users, but the structure should be there
-        upload_inputs = page.query_selector_all("input[type='file']")
-        upload_buttons = page.query_selector_all("button[aria-label*='upload'], .upload-btn, [data-testid*='upload']")
-        
+        _ = page.query_selector_all("input[type='file']")
+        _ = page.query_selector_all("button[aria-label*='upload'], .upload-btn, [data-testid*='upload']") # pylint: disable=line-too-long
+
         # Test should pass even if no upload elements found (they may require auth)
         # This documents the current UI state for future reference
-        
+
         # Verify the page loaded successfully
         current_url = page.url
         assert current_url.endswith("/"), f"Expected URL to end with '/', got: {current_url}"
-        
+
         # Check that the page has some interactive elements
         interactive_elements = page.query_selector_all("button, input, select, textarea")
         # Even unauthenticated pages should have some UI elements

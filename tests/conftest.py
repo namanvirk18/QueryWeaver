@@ -18,7 +18,6 @@ def pytest_configure(config):
 @pytest.fixture(scope="session")
 def fastapi_app():
     """Start the FastAPI application for testing."""
-    
     # Ensure required environment variables are set for testing
     env_defaults = {
         'FALKORDB_HOST': 'localhost',
@@ -37,12 +36,12 @@ def fastapi_app():
     # Get the project root directory (parent of tests directory)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(current_dir)
-    
+
     # Use a different port for tests to avoid conflicts
     test_port = 5001
 
     # Start the FastAPI app using pipenv, with output visible for debugging
-    process = subprocess.Popen([
+    process = subprocess.Popen([  # pylint: disable=consider-using-with
         "pipenv", "run", "uvicorn", "api.index:app",
         "--host", "localhost", "--port", str(test_port)
     ], cwd=project_root)
@@ -51,14 +50,14 @@ def fastapi_app():
     max_retries = 30
     app_started = False
     base_url = f"http://localhost:{test_port}"
-    
+
     for i in range(max_retries):
         try:
             response = requests.get(base_url, timeout=2)
             if response.status_code == 200:
                 app_started = True
                 break
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException:
             # Check if process is still running
             if process.poll() is not None:
                 print(f"FastAPI process died early with return code: {process.returncode}")
@@ -66,7 +65,7 @@ def fastapi_app():
             if i % 10 == 0:  # Print progress every 10 retries
                 print(f"Waiting for app to start... attempt {i+1}/{max_retries}")
             time.sleep(1)
-    
+
     if not app_started:
         process.terminate()
         process.wait()
@@ -81,13 +80,13 @@ def fastapi_app():
 
 
 @pytest.fixture
-def app_url(fastapi_app):
+def app_url(fastapi_app):  # pylint: disable=redefined-outer-name
     """Provide the base URL for the application."""
     return fastapi_app
 
 
 @pytest.fixture
-def page_with_base_url(page, app_url):
+def page_with_base_url(page, app_url):  # pylint: disable=redefined-outer-name
     """Provide a page with app_url attribute set."""
     # Attach app_url to the page object for test code that expects it
     page.app_url = app_url
@@ -96,7 +95,7 @@ def page_with_base_url(page, app_url):
 
 
 @pytest.fixture
-def authenticated_page(page, app_url):
+def authenticated_page(page, app_url):  # pylint: disable=redefined-outer-name
     """Provide a page with test authentication enabled."""
     # Set test authentication cookie that the server will recognize
     # when ENABLE_TEST_AUTH=true
@@ -109,7 +108,7 @@ def authenticated_page(page, app_url):
         'secure': False,    # HTTP in test environment
         'sameSite': 'Lax'
     }])
-    
+
     page.app_url = app_url
     page.goto(app_url, wait_until="domcontentloaded", timeout=60000)
     yield page

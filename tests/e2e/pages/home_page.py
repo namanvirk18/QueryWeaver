@@ -1,6 +1,7 @@
 """
 Home Page Object for QueryWeaver application.
 """
+# pylint: disable=broad-exception-caught
 from tests.e2e.pages.base_page import BasePage
 
 
@@ -58,8 +59,8 @@ class HomePage(BasePage):
         # The file input might not be visible, but we can still set files on it
         file_input = self.page.query_selector(self.FILE_UPLOAD)
         if not file_input:
-            raise Exception("File upload input not found")
-        
+            raise Exception("File upload input not found") # pylint: disable=broad-exception-raised
+
         # Set the file even if input is not visible (common for file inputs)
         self.page.set_input_files(self.FILE_UPLOAD, file_path)
 
