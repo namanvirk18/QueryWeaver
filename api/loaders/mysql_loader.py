@@ -30,13 +30,13 @@ class MySQLLoader(BaseLoader):
     Loader for MySQL databases that connects and extracts schema information.
     """
 
-    # DDL operations that modify database schema
+    # DDL operations that modify database schema  # pylint: disable=duplicate-code
     SCHEMA_MODIFYING_OPERATIONS = {
         'CREATE', 'ALTER', 'DROP', 'RENAME', 'TRUNCATE'
     }
 
     # More specific patterns for schema-affecting operations
-    SCHEMA_PATTERNS = [
+    SCHEMA_PATTERNS = [  # pylint: disable=duplicate-code
         r'^\s*CREATE\s+TABLE',
         r'^\s*CREATE\s+INDEX',
         r'^\s*CREATE\s+UNIQUE\s+INDEX',
@@ -463,7 +463,7 @@ class MySQLLoader(BaseLoader):
             Tuple of (success, message)
         """
         try:
-            logging.info("Schema modification detected. Refreshing graph schema for: %s", graph_id)
+            logging.info("Schema modification detected. Refreshing graph schema.")
 
             # Import here to avoid circular imports
             from api.extensions import db  # pylint: disable=import-error,import-outside-toplevel
@@ -489,7 +489,7 @@ class MySQLLoader(BaseLoader):
                 logging.info("Graph schema refreshed successfully.")
                 return True, message
 
-            logging.error("Schema refresh failed for graph %s: %s", graph_id, message)
+            logging.error("Schema refresh failed")
             return False, "Failed to reload schema"
 
         except Exception as e:  # pylint: disable=broad-exception-caught

@@ -18,7 +18,7 @@ The E2E test suite covers:
 tests/e2e/
 ├── pages/              # Page Object Model classes
 │   ├── base_page.py   # Base page with common functionality
-│   └── home_page.py   # Home/chat page interactions
+│   └── home_page.py   # Home/ page interactions
 ├── fixtures/          # Test data and utilities
 │   └── test_data.py   # Sample data generators
 ├── test_basic_functionality.py  # Core app functionality tests
