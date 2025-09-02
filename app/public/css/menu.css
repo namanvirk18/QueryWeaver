@@ -130,6 +130,8 @@
 #graph-select-refresh svg {
   height: 20px;
   width: 20px;
+}
+
 #query-final-result-table {
   border-collapse: collapse;
 }
@@ -317,10 +319,12 @@
 
 /* Make the database-type dropdown match the input width and add gap */
 #database-type-dropdown {
-  display: block; /* behave like a block element so width:100% applies */
+  display: block;
+  /* behave like a block element so width:100% applies */
   width: 100%;
   box-sizing: border-box;
-  margin: 0 0 12px 0; /* gap between dropdown and input; prevent horizontal centering */
+  margin: 0 0 12px 0;
+  /* gap between dropdown and input; prevent horizontal centering */
 }
 
 #database-type-dropdown .dropdown-selected {
@@ -330,6 +334,7 @@
   align-items: center;
   justify-content: space-between;
 }
+
 /* Match modal input sizing for a consistent look */
 #database-type-dropdown .dropdown-selected {
   padding: 0.6em;
@@ -339,7 +344,8 @@
 
 #database-type-dropdown .dropdown-options {
   left: 0;
-  right: 0; /* ensure options fill the same width */
+  right: 0;
+  /* ensure options fill the same width */
 }
 
 .dropdown-option {
