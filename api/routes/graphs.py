@@ -802,7 +802,7 @@ async def refresh_graph_schema(request: Request, graph_id: str):
         db_request = DatabaseConnectionRequest(url=db_url)
         
         # Call connect_database to refresh the schema by reconnecting
-        return connect_database(request, db_request)
+        return await connect_database(request, db_request)
             
     except HTTPException:
         raise

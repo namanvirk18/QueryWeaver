@@ -80,6 +80,9 @@ function setupEventListeners() {
 
   DOM.graphSelectRefresh?.addEventListener("click", async () => {
     const selected = getSelectedGraph();
+    const refreshButton = DOM.graphSelectRefresh;
+
+    if (!refreshButton) return;
 
     if (
       !selected ||
@@ -88,7 +91,7 @@ function setupEventListeners() {
     )
       return alert("Please select a database to refresh");
 
-    DOM.graphSelectRefresh?.classList.add("loading");
+    refreshButton.classList.add("loading");
 
     const result = await fetch(
       `/graphs/${encodeURIComponent(selected)}/refresh`,
@@ -106,9 +109,50 @@ function setupEventListeners() {
       return;
     }
 
-    await loadAndShowGraph(selected);
-    setTimeout(resizeGraph, 450);
-    DOM.graphSelectRefresh?.classList.remove("loading");
+    if (result.body) {
+      const reader = result.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete messages separated by boundary
+          const messages = buffer.split("|||FALKORDB_MESSAGE_BOUNDARY|||");
+          buffer = messages.pop() || ""; // Keep incomplete message in buffer
+
+          for (const message of messages) {
+            if (message.trim()) {
+              try {
+                const parsed = JSON.parse(message.trim());
+
+                if (parsed.type === "reasoning_step") {
+                  refreshButton.title += ` ${parsed.message}\n`;
+                } else if (parsed.type === "final_result") {
+                  refreshButton.title += ` ${parsed.message}`;
+                }
+              } catch (e) {
+                console.warn("Failed to parse message:", message, e);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
+
+    if (DOM.schemaContainer && DOM.schemaContainer.classList.contains("open")) {
+      await loadAndShowGraph(selected);
+      setTimeout(resizeGraph, 450);
+    }
+
+    refreshButton.classList.remove("loading");
+    refreshButton.title = "";
   });
 
   DOM.newChatButton?.addEventListener("click", showResetConfirmation);
