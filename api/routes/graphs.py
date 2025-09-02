@@ -216,7 +216,7 @@ async def get_graph_data(request: Request, graph_id: str):  # pylint: disable=to
 
 @graphs_router.post("")
 @token_required
-async def load_graph(request: Request, data: GraphData = None, file: UploadFile = File(None)):
+async def load_graph(request: Request, data: GraphData = None, file: UploadFile = File(None)): # pylint: disable=unused-argument
     """
     This route is used to load the graph data into the database.
     It expects either:
@@ -224,18 +224,16 @@ async def load_graph(request: Request, data: GraphData = None, file: UploadFile 
     - A File upload (multipart/form-data)
     - An XML payload (application/xml or text/xml)
     """
-    success, result = False, "Invalid content type"
-    graph_id = ""
 
     # ✅ Handle JSON Payload
-    if data:
+    if data: # pylint: disable=no-else-raise
         raise HTTPException(status_code=501, detail="JSONLoader is not implemented yet")
     # ✅ Handle File Upload
     elif file:
         filename = file.filename
 
         # ✅ Check if file is JSON
-        if filename.endswith(".json"):
+        if filename.endswith(".json"): # pylint: disable=no-else-raise
             raise HTTPException(status_code=501, detail="JSONLoader is not implemented yet")
 
         # ✅ Check if file is XML
@@ -553,8 +551,7 @@ What this will do:
                 # SQL query is not valid/translatable - generate follow-up questions
                 follow_up_result = follow_up_agent.generate_follow_up_question(
                     user_question=queries_history[-1],
-                    analysis_result=answer_an,
-                    found_tables=result
+                    analysis_result=answer_an
                 )
 
                 # Send follow-up questions to help the user
@@ -750,7 +747,8 @@ async def confirm_destructive_operation(
                     )
                 )
                 save_query_task.add_done_callback(
-                    lambda t: logging.error("Confirmed query memory save failed: %s", t.exception())  # nosemgrep
+                    lambda t: logging.error("Confirmed query memory save failed: %s",
+                                            t.exception())  # nosemgrep
                     if t.exception() else logging.info("Confirmed query memory saved successfully")
                 )
 
@@ -820,7 +818,7 @@ async def refresh_graph_schema(request: Request, graph_id: str):
             }, status_code=400)
 
         # Perform schema refresh using the appropriate loader
-        success, message = await loader_class.refresh_graph_schema(graph_id, db_url)
+        success, _ = await loader_class.refresh_graph_schema(graph_id, db_url)
 
         if success:
             return JSONResponse({

@@ -1,6 +1,7 @@
 """
 Test fixtures and sample data for E2E tests.
 """
+# pylint: disable=consider-using-with
 import json
 import tempfile
 import os
