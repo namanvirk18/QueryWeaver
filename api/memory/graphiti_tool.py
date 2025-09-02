@@ -637,7 +637,8 @@ def get_azure_openai_clients():
 
 def create_graphiti_client(falkor_driver: FalkorDriver) -> Graphiti:
     """Create a Graphiti client configured with Azure OpenAI."""
-    if Config.AZURE_FLAG: # Initialize Graphiti with Azure OpenAI clients
+    # Initialize Graphiti with Azure OpenAI clients
+    if Config.AZURE_FLAG:
         # Get Azure OpenAI clients and config
         llm_client_azure, embedding_client_azure, config = get_azure_openai_clients()
 
