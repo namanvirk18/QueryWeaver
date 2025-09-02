@@ -203,6 +203,18 @@
   border: none;
   font-size: 18px !important;
   font-weight: 500 !important;
+  resize: none;
+  min-height: 24px;
+  height: 24px;
+  max-height: calc(24px * 5);
+  overflow-y: auto;
+  line-height: 24px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+#message-input::-webkit-scrollbar {
+  display: none;
 }
 
 #message-input:focus {

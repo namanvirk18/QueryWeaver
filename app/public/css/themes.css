@@ -1,9 +1,5 @@
 /* Theme-specific Styles and Overrides */
 
-[data-theme="light"] .logo {
-  filter: invert(1);
-}
-
 /* Theme icon states */
 [data-theme="dark"] .theme-icon .sun,
 [data-theme="system"] .theme-icon .sun {

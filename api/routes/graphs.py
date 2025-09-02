@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from redis import ResponseError
 
+from api.routes.database import connect_database, DatabaseConnectionRequest
 from api.agents import AnalysisAgent, RelevancyAgent, ResponseFormatterAgent, FollowUpAgent
 from api.auth.user_management import token_required
 from api.config import Config
@@ -372,7 +373,7 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest): 
             logging.info("Generated SQL query: %s", answer_an['sql_query'])  # nosemgrep
             yield json.dumps(
                 {
-                    "type": "final_result",
+                    "type": "sql_query",
                     "data": answer_an["sql_query"],
                     "conf": answer_an["confidence"],
                     "miss": answer_an["missing_information"],
@@ -799,45 +800,23 @@ async def refresh_graph_schema(request: Request, graph_id: str):
     graph_id = _graph_name(request, graph_id)
 
     try:
-        # Get database connection details
+        # Get database description and URL
         _, db_url = await get_db_description(graph_id)
 
         if not db_url or db_url == "No URL available for this database.":
-            return JSONResponse({
-                "success": False,
-                "error": "No database URL found for this graph"
-            }, status_code=400)
+            raise HTTPException(status_code=404, detail="No database URL found for this graph")
 
-        # Determine database type and get appropriate loader
-        db_type, loader_class = get_database_type_and_loader(db_url)
+        # Create a database connection request with the stored URL
+        db_request = DatabaseConnectionRequest(url=db_url)
 
-        if not loader_class:
-            return JSONResponse({
-                "success": False,
-                "error": "Unable to determine database type"
-            }, status_code=400)
+        # Call connect_database to refresh the schema by reconnecting
+        return await connect_database(request, db_request)
 
-        # Perform schema refresh using the appropriate loader
-        success, _ = await loader_class.refresh_graph_schema(graph_id, db_url)
-
-        if success:
-            return JSONResponse({
-                "success": True,
-                "message": f"Graph schema refreshed successfully using {db_type}"
-            })
-
-        logging.error("Schema refresh failed")  # nosemgrep
-        return JSONResponse({
-            "success": False,
-            "error": "Failed to refresh schema"
-        }, status_code=500)
-
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logging.error("Error in manual schema refresh: %s", e)  # nosemgrep
-        return JSONResponse({
-            "success": False,
-            "error": "Error refreshing schema"
-        }, status_code=500)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error("Error in refresh_graph_schema: %s", str(e))
+        raise HTTPException(status_code=500, detail="Internal server error while refreshing schema") # pylint: disable=raise-missing-from
 
 @graphs_router.delete("/{graph_id}")
 @token_required
