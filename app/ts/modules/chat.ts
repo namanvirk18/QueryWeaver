@@ -11,10 +11,7 @@ export async function sendMessage() {
     if (!message) return;
 
     const selectedValue = getSelectedGraph() || '';
-    if (!selectedValue || selectedValue === "Select Database") {
-        addMessage('Please select a graph from the dropdown before sending a message.', "followup");
-        return;
-    }
+    if (!selectedValue || selectedValue === "Select Database") return
 
     if (state.currentRequestController) {
         state.currentRequestController.abort();

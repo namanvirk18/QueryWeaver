@@ -43,6 +43,10 @@ export function addGraphOption(name: string, onSelect: (n: string) => void, onDe
     row.appendChild(delBtn);
 
     row.addEventListener('click', () => {
+        if (DOM.graphSelectRefresh && DOM.submitButton) {
+            DOM.graphSelectRefresh.disabled = false
+            DOM.submitButton.disabled = false
+        };
         setSelectedGraph(name);
         onSelect(name);
         optionsContainer.classList.remove('open');

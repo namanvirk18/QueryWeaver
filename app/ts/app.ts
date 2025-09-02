@@ -84,8 +84,7 @@ function setupEventListeners() {
 
     if (!refreshButton) return;
 
-    if (!selected || selected === "Select Database")
-      return alert("Please select a database to refresh");
+    if (!selected || selected === "Select Database") return
 
     refreshButton.classList.add("loading");
 
