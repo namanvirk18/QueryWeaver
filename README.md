@@ -50,6 +50,8 @@ docker run -p 5000:5000 -it \
   falkordb/queryweaver
 ```
 
+Note: To use OpenAI directly instead of Azure OpenAI, replace `AZURE_API_KEY` with `OPENAI_API_KEY` in the above command.
+
 For a full list of configuration options, consult `.env.example`.
 
 ## MCP server: host or connect (optional)
@@ -303,6 +305,54 @@ APP_ENV=development
 ```
 
 **Important**: If you're getting "mismatching_state: CSRF Warning!" errors on staging/production, ensure `APP_ENV` is set to `production` or `staging` to enable secure session handling.
+
+### AI/LLM configuration
+
+QueryWeaver uses AI models for Text2SQL conversion and supports both Azure OpenAI and OpenAI directly.
+
+#### Default: Azure OpenAI
+
+By default, QueryWeaver is configured to use Azure OpenAI. You need to set all three Azure credentials:
+
+```bash
+AZURE_API_KEY=your_azure_api_key
+AZURE_API_BASE=https://your-resource.openai.azure.com/
+AZURE_API_VERSION=2024-12-01-preview
+```
+
+#### Alternative: OpenAI directly
+
+To use OpenAI directly instead of Azure, simply set the `OPENAI_API_KEY` environment variable:
+
+```bash
+OPENAI_API_KEY=your_openai_api_key
+```
+
+When `OPENAI_API_KEY` is provided, QueryWeaver automatically switches to use OpenAI's models:
+- Embedding model: `openai/text-embedding-ada-002`
+- Completion model: `openai/gpt-4.1`
+
+This configuration is handled automatically in `api/config.py` - you only need to provide the appropriate API key.
+
+#### Docker examples with AI configuration
+
+Using Azure OpenAI:
+```bash
+docker run -p 5000:5000 -it \
+  -e FASTAPI_SECRET_KEY=your_secret_key \
+  -e AZURE_API_KEY=your_azure_api_key \
+  -e AZURE_API_BASE=https://your-resource.openai.azure.com/ \
+  -e AZURE_API_VERSION=2024-12-01-preview \
+  falkordb/queryweaver
+```
+
+Using OpenAI directly:
+```bash
+docker run -p 5000:5000 -it \
+  -e FASTAPI_SECRET_KEY=your_secret_key \
+  -e OPENAI_API_KEY=your_openai_api_key \
+  falkordb/queryweaver
+```
 
 ## Testing
 

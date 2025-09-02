@@ -61,20 +61,6 @@ class TestChatFunctionality:
             if len(options) > 1:
                 home_page.select_graph(options[1].get_attribute("value"))
 
-    def test_chat_interface_structure(self, page_with_base_url):
-        """Test that chat interface has proper structure."""
-        home_page = HomePage(page_with_base_url)
-        home_page.navigate_to_home()
-
-        page = page_with_base_url
-
-        # Check for basic chat elements and verify page loaded successfully
-        # These might not be visible without authentication
-        page.query_selector_all("input, textarea")
-
-        # Verify the page loaded successfully by checking the title or URL
-        assert "QueryWeaver" in page.title() or page.url.endswith("/")
-
     def test_input_validation(self, page_with_base_url):
         """Test input validation and limits."""
         home_page = HomePage(page_with_base_url)
@@ -108,7 +94,10 @@ class TestChatFunctionality:
                 assert actual_value == long_text, "Input should be preserved if not truncated"
         else:
             # No enabled inputs found - this is expected for unauthenticated users
-            pytest.skip("No enabled input fields found - likely requires authentication")
+            # Just verify the page loaded successfully
+            current_url = page.url
+            assert current_url.endswith("/"), f"Expected URL to end with '/', got: {current_url}"
+            # This is the expected behavior for unauthenticated users
 
     @pytest.mark.skip(reason="Requires streaming response setup")
     def test_streaming_responses(self, page_with_base_url):

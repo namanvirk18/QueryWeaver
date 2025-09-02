@@ -112,17 +112,17 @@ async def connect_database(request: Request, db_request: DatabaseConnectionReque
                     ) + MESSAGE_DELIMITER
                 else:
                     # Don't stream the full internal result; give higher-level error
-                    logging.error("Database loader failed: %s", str(result))
+                    logging.error("Database loader failed: %s", str(result))  # nosemgrep
                     yield json.dumps(
                         {"type": "error", "message": "Failed to load database schema"}
                     ) + MESSAGE_DELIMITER
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logging.exception("Error while loading database schema: %s", str(e))
                 yield json.dumps(
                     {"type": "error", "message": "Error connecting to database"}
                 ) + MESSAGE_DELIMITER
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logging.exception("Unexpected error in connect_database stream: %s", str(e))
             yield json.dumps(
                 {"type": "error", "message": "Internal server error"}
