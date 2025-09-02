@@ -3,7 +3,7 @@
  */
 
 import { DOM, state } from "./config";
-import { getSelectedGraph } from './graph_select';
+import { getSelectedGraph } from "./graph_select";
 
 export function addMessage(
   message: string,
@@ -14,7 +14,7 @@ export function addMessage(
     | "final-result"
     | "query-final-result"
     | "loading" = "bot",
-  isQuery: boolean = false,
+  isQuery = false,
   userInfo: { picture?: string; name?: string } | null = null,
   queryResult: any = null
 ) {
@@ -182,12 +182,14 @@ export function initChat() {
     if (element) element.innerHTML = "";
   });
 
-    const selected = getSelectedGraph();
-    if (selected) {
-        addMessage('Hello! How can I help you today?');
-    } else {
-        addMessage('Hello! Please select a graph from the dropdown above, upload a schema or connect to a database to get started.');
-    }
+  const selected = getSelectedGraph();
+  if (selected) {
+    addMessage("Hello! How can I help you today?");
+  } else {
+    addMessage(
+      "Hello! Please select a graph from the dropdown above, upload a schema or connect to a database to get started."
+    );
+  }
 
   state.questions_history = [];
   state.result_history = [];
