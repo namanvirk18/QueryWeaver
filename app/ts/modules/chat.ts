@@ -17,7 +17,7 @@ export async function sendMessage() {
         state.currentRequestController.abort();
     }
 
-    addMessage(message, "user", (window as any).currentUser || null);
+    addMessage(message, "user", false, (window as any).currentUser || null);
     if (DOM.messageInput) DOM.messageInput.value = '';
 
     // Show typing indicator
