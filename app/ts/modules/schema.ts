@@ -199,15 +199,9 @@ export function showGraph(data: any) {
     graphInstance.linkDirectionalArrowLength(6).linkDirectionalArrowRelPos(1);
   }
 
-  const zoomInButton = document.getElementById(
-    "schema-controls-zoom-in"
-  ) as HTMLButtonElement;
-  const zoomOutButton = document.getElementById(
-    "schema-controls-zoom-out"
-  ) as HTMLButtonElement;
-  const centerButton = document.getElementById(
-    "schema-controls-center"
-  ) as HTMLButtonElement;
+  const zoomInButton = document.getElementById("schema-controls-zoom-in") as HTMLButtonElement;
+  const zoomOutButton = document.getElementById("schema-controls-zoom-out") as HTMLButtonElement;
+  const centerButton = document.getElementById("schema-controls-center") as HTMLButtonElement;
 
   zoomInButton.addEventListener("click", () => {
     graphInstance.zoom(graphInstance.zoom() * 1.1);
@@ -230,6 +224,7 @@ const center = () => {
     graphInstance.zoomToFit(500, padding);
   }
 };
+
 export function resizeGraph() {
   if (graphInstance) {
     const container = document.getElementById("schema-graph") as HTMLDivElement;

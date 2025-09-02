@@ -22,6 +22,7 @@ import { setupAuthenticationModal, setupDatabaseModal } from './modules/modals';
 import { resizeGraph, showGraph } from './modules/schema';
 import { setupTokenManagement } from './modules/tokens';
 import { initLeftToolbar } from './modules/left_toolbar';
+import { resizeGraph } from './modules/schema';
 
 async function loadAndShowGraph(selected: string | undefined) {
     if (!selected) return;
