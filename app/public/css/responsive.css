@@ -2,6 +2,7 @@
 
 /* Layout Responsive */
 @media (max-width: 768px) {
+
   /* When left toolbar is open, push content to make room */
   body.left-toolbar-open .chat-container {
     max-width: calc(100vw - 48px);
@@ -42,13 +43,14 @@
 
   /* Ensure chat header elements are properly positioned when toolbar is open */
   body.left-toolbar-open .chat-header {
-    padding-left: 15px; /* Add extra padding to prevent overlap */
+    padding-left: 15px;
+    /* Add extra padding to prevent overlap */
     width: 100%;
     box-sizing: border-box;
   }
 
   /* Ensure dropdown and buttons in header don't get cut off */
-  body.left-toolbar-open .chat-header > * {
+  body.left-toolbar-open .chat-header>* {
     margin-left: 0;
     width: 100%;
   }
@@ -84,15 +86,15 @@
     padding: 10px 12px;
     font-size: 14px;
   }
-  
+
   .chat-header h1 {
     font-size: 18px;
   }
-  
+
   #message-input {
     font-size: 16px !important;
   }
-  
+
   #message-input::placeholder {
     font-size: 16px !important;
   }
@@ -110,14 +112,13 @@
     flex-wrap: nowrap;
     align-items: stretch;
   }
-  
+
   /* Hide vertical separators on mobile */
   .vertical-separator {
     display: none;
   }
-  
+
   /* Make selectors and buttons fit screen width */
-  #graph-select,
   #custom-file-upload {
     flex: 1;
     min-width: 0;
@@ -129,11 +130,7 @@
     height: 40px;
     box-sizing: border-box;
   }
-  
-  #graph-select {
-    max-width: 30%;
-  }
-  
+
   #custom-file-upload {
     max-width: 35%;
     text-align: center;
@@ -142,12 +139,12 @@
     justify-content: center;
     cursor: pointer;
   }
-  
+
   .header-button {
     width: 100%;
     height: 40px;
   }
-  
+
   .dropdown-selected {
     padding: 8px 6px;
     font-size: 13px;
@@ -157,14 +154,14 @@
     align-items: center;
     justify-content: space-between;
   }
-  
+
   .dropdown-text {
     text-overflow: ellipsis;
     white-space: nowrap;
     overflow: hidden;
     flex: 1;
   }
-  
+
   .dropdown-arrow {
     margin-left: 4px;
     flex-shrink: 0;
@@ -176,18 +173,17 @@
     padding: 0;
     gap: 5px;
   }
-  
-  #graph-select,
+
   #custom-file-upload {
     padding: 6px 4px;
     font-size: 12px;
     height: 36px;
   }
-  
+
   .header-button {
     height: 36px;
   }
-  
+
   .dropdown-selected {
     padding: 6px 4px;
     font-size: 12px;
@@ -211,7 +207,7 @@
     transform: none;
     margin-left: 10px;
   }
-  
+
   #reset-button svg {
     width: 18px;
     height: 18px;
@@ -229,13 +225,16 @@
     /* Reduce padding on mobile to maximize input space */
     padding: 8px;
     gap: 4px;
-    min-width: 0; /* Allow container to shrink */
+    min-width: 0;
+    /* Allow container to shrink */
     flex-shrink: 1;
   }
 
   #message-input {
-    font-size: 16px !important; /* Prevent zoom on iOS */
-    min-width: 0; /* Allow input to shrink */
+    font-size: 16px !important;
+    /* Prevent zoom on iOS */
+    min-width: 0;
+    /* Allow input to shrink */
   }
 
   #message-input::placeholder {
@@ -246,7 +245,8 @@
   .input-button {
     width: 40px;
     height: 40px;
-    flex-shrink: 0; /* Prevent buttons from shrinking */
+    flex-shrink: 0;
+    /* Prevent buttons from shrinking */
   }
 }
 
@@ -266,7 +266,7 @@
     width: 40px;
     height: 40px;
   }
-  
+
   #github-link-btn {
     top: 15px;
     right: 60px;
@@ -274,7 +274,7 @@
     font-size: 12px;
     height: 40px;
   }
-  
+
   .theme-icon {
     width: 18px;
     height: 18px;

@@ -46,13 +46,24 @@ export function loadGraphs() {
                 // Update the visible selected label to show no graphs state
                 const selectedLabel = document.getElementById('graph-selected');
                 if (selectedLabel) {
-                    const dropdownText = selectedLabel.querySelector('.dropdown-text');
+                    const dropdownText = selectedLabel.querySelector('.dropdown-text') as HTMLElement | null;
                     if (dropdownText) {
-                        dropdownText.textContent = 'No Databases';
-                    } 
+                        dropdownText.textContent = 'No databases';
+                        dropdownText.title = 'No databases';
+                    }
                 }
                 return;
             }
+            
+            const selectedLabel = document.getElementById('graph-selected');
+            if (selectedLabel) {
+                const dropdownText = selectedLabel.querySelector('.dropdown-text') as HTMLElement | null;
+                if (dropdownText) {
+                    dropdownText.textContent = 'Select database';
+                    dropdownText.title = 'Select database';
+                }
+            }
+
 
             // populate hidden select for legacy code
             data.forEach(graph => {
