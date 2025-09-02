@@ -405,7 +405,7 @@
 
 .graph-options {
   position: absolute;
-  top: calc(100% + 20px);
+  top: 100%;
   left: -20%;
   right: -20%;
   background: var(--falkor-secondary);

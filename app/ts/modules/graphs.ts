@@ -44,7 +44,6 @@ export function loadGraphs() {
       return response.json();
     })
     .then((data: string[]) => {
-      console.log("Graphs loaded:", data);
       if (!data || data.length === 0) {
         // Clear custom dropdown and show no graphs state
         clearGraphOptions();
@@ -64,7 +63,7 @@ export function loadGraphs() {
         if (selectedLabel) {
           const dropdownText = selectedLabel.querySelector(".dropdown-text");
           if (dropdownText) {
-            dropdownText.textContent = "No Databases";
+            dropdownText.textContent = "Select Database";
           }
         }
         return;

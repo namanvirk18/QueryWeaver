@@ -18,10 +18,10 @@ import {
   handleWindowResize,
   setupCustomDropdown,
 } from "./modules/ui";
-import { setupAuthenticationModal, setupDatabaseModal } from './modules/modals';
-import { resizeGraph, showGraph } from './modules/schema';
-import { setupTokenManagement } from './modules/tokens';
-import { initLeftToolbar } from './modules/left_toolbar';
+import { setupAuthenticationModal, setupDatabaseModal } from "./modules/modals";
+import { resizeGraph, showGraph } from "./modules/schema";
+import { setupTokenManagement } from "./modules/tokens";
+import { initLeftToolbar } from "./modules/left_toolbar";
 
 async function loadAndShowGraph(selected: string | undefined) {
   if (!selected) return;
@@ -84,11 +84,7 @@ function setupEventListeners() {
 
     if (!refreshButton) return;
 
-    if (
-      !selected ||
-      selected === "Select database" ||
-      selected === "No databases"
-    )
+    if (!selected || selected === "Select Database")
       return alert("Please select a database to refresh");
 
     refreshButton.classList.add("loading");

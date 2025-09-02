@@ -8,7 +8,7 @@
 
 QueryWeaver is an open-source Text2SQL tool that converts plain-English questions into SQL using graph-powered schema understanding. It helps you ask databases natural-language questions and returns SQL and results.
 
-![Screenshot](https://github.com/user-attachments/assets/a0be7bbd-0c99-4399-a302-2b9f7b419dd2)
+![Screenshot](https://github.com/user-attachments/assets/e5a577a0-c157-44ff-9aeb-3522a757b536)
 
 TL;DR
 - Try quickly with Docker: `docker run -p 5000:5000 -it falkordb/queryweaver`
