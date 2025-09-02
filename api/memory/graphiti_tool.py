@@ -40,7 +40,6 @@ class MemoryTool:
 
         self.user_id = user_id
         self.graph_id = graph_id
-        self.config = Config()
 
 
     @classmethod
@@ -570,7 +569,7 @@ class MemoryTool:
         
         try:
             response = completion(
-                model=self.config.COMPLETION_MODEL,
+                model=Config.COMPLETION_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1
             )
@@ -638,28 +637,33 @@ def get_azure_openai_clients():
 
 def create_graphiti_client(falkor_driver: FalkorDriver) -> Graphiti:
     """Create a Graphiti client configured with Azure OpenAI."""
-    # Get Azure OpenAI clients and config
-    llm_client_azure, embedding_client_azure, config = get_azure_openai_clients()
-
-    # Create LLM Config with Azure deployment names
-    azure_llm_config = LLMConfig(
-        small_model=config.small_model_deployment,
-        model=config.llm_deployment,
-    )
-
     # Initialize Graphiti with Azure OpenAI clients
-    return Graphiti(
-        graph_driver=falkor_driver,
-        llm_client=OpenAIClient(config=azure_llm_config, client=llm_client_azure),
-        embedder=OpenAIEmbedder(
-            config=OpenAIEmbedderConfig(embedding_model=config.embedding_deployment),
-            client=embedding_client_azure,
-        ),
-        cross_encoder=OpenAIRerankerClient(
-            config=LLMConfig(
-                model=azure_llm_config.small_model  # Use small model for reranking
+    if Config.AZURE_FLAG:
+        # Get Azure OpenAI clients and config
+        llm_client_azure, embedding_client_azure, config = get_azure_openai_clients()
+
+        # Create LLM Config with Azure deployment names
+        azure_llm_config = LLMConfig(
+            small_model=config.small_model_deployment,
+            model=config.llm_deployment,
+        )
+
+        graphiti_client = Graphiti(
+            graph_driver=falkor_driver,
+            llm_client=OpenAIClient(config=azure_llm_config, client=llm_client_azure),
+            embedder=OpenAIEmbedder(
+                config=OpenAIEmbedderConfig(embedding_model=config.embedding_deployment),
+                client=embedding_client_azure,
             ),
-            client=llm_client_azure,
-        ),
-    )
+            cross_encoder=OpenAIRerankerClient(
+                config=LLMConfig(
+                    model=azure_llm_config.small_model  # Use small model for reranking
+                ),
+                client=llm_client_azure,
+            ),
+        )
+    else:  # Fallback to default OpenAI config
+        graphiti_client = Graphiti(graph_driver=falkor_driver)
+
+    return graphiti_client
 

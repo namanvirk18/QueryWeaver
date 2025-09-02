@@ -70,3 +70,5 @@ namespace
 namespaced
 
 CSRF
+LLM
+OpenAI
