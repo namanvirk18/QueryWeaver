@@ -4,7 +4,6 @@
 
 import { DOM, state } from './config';
 import { getSelectedGraph } from './graph_select';
-import { adjustTextareaHeight } from './input';
 
 export function addMessage(
     message: string,
@@ -134,10 +133,7 @@ export function formatBlock(text: string) {
 }
 
 export function initChat() {
-    if (DOM.messageInput) {
-        DOM.messageInput.value = '';
-        adjustTextareaHeight();
-    }
+    if (DOM.messageInput) DOM.messageInput.value = '';
     if (DOM.chatMessages) DOM.chatMessages.innerHTML = '';
     [DOM.confValue, DOM.expValue, DOM.missValue].forEach((element) => {
         if (element) element.innerHTML = '';

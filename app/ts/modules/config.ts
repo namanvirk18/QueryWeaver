@@ -37,7 +37,7 @@ function getElement<T extends HTMLElement | null>(id: string): T {
 }
 
 export const DOM = {
-    messageInput: getElement<HTMLTextAreaElement | null>('message-input'),
+    messageInput: getElement<HTMLInputElement | null>('message-input'),
     submitButton: getElement<HTMLButtonElement | null>('submit-button'),
     pauseButton: getElement<HTMLButtonElement | null>('pause-button'),
     newChatButton: getElement<HTMLButtonElement | null>('reset-button'),

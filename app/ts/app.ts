@@ -22,7 +22,6 @@ import { setupAuthenticationModal, setupDatabaseModal } from './modules/modals';
 import { resizeGraph, showGraph } from './modules/schema';
 import { setupTokenManagement } from './modules/tokens';
 import { initLeftToolbar } from './modules/left_toolbar';
-import { setupTextareaAutoResize } from './modules/input';
 
 async function loadAndShowGraph(selected: string | undefined) {
     if (!selected) return;
@@ -59,11 +58,8 @@ function initializeApp() {
 function setupEventListeners() {
     DOM.submitButton?.addEventListener('click', sendMessage);
     DOM.pauseButton?.addEventListener('click', pauseRequest);
-    DOM.messageInput?.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
+    DOM.messageInput?.addEventListener('keypress', (e: KeyboardEvent) => {
+        if ((e as KeyboardEvent).key === 'Enter') sendMessage();
     });
 
     DOM.menuButton?.addEventListener('click', () => toggleContainer(DOM.menuContainer as HTMLElement));
@@ -116,7 +112,6 @@ function setupUIComponents() {
     // initialize left toolbar behavior (burger, responsive default)
     initLeftToolbar();
     setupCustomDropdown();
-    setupTextareaAutoResize();
 }
 
 function loadInitialData() {

@@ -46,7 +46,6 @@
     transition: margin-left 220ms ease;
   }
 }
-
 .message-container {
   display: flex;
   flex-direction: row;
@@ -147,9 +146,7 @@
 }
 
 /* Styles for formatted text blocks */
-.sql-line,
-.array-line,
-.plain-line {
+.sql-line, .array-line, .plain-line {
   word-wrap: break-word;
   overflow-wrap: break-word;
   white-space: pre-wrap;

@@ -5,7 +5,6 @@
 import { DOM, state, MESSAGE_DELIMITER } from './config';
 import { addMessage, removeLoadingMessage, moveLoadingMessageToBottom } from './messages';
 import { getSelectedGraph } from './graph_select';
-import { adjustTextareaHeight } from './input';
 
 export async function sendMessage() {
     const message = (DOM.messageInput?.value || '').trim();
@@ -22,10 +21,7 @@ export async function sendMessage() {
     }
 
     addMessage(message, true, false, false, false, (window as any).currentUser || null);
-    if (DOM.messageInput) {
-        DOM.messageInput.value = '';
-        adjustTextareaHeight();
-    }
+    if (DOM.messageInput) DOM.messageInput.value = '';
 
     // Show typing indicator
     DOM.inputContainer?.classList.add('loading');
