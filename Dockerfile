@@ -16,6 +16,7 @@ COPY --from=python-base /usr/local /usr/local
 # Install netcat for wait loop in start.sh
 RUN apt-get update && apt-get install -y \
     netcat-openbsd \
+    git \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/local/bin/python3.12 /usr/bin/python3 \
     && ln -sf /usr/local/bin/python3.12 /usr/bin/python
