@@ -146,14 +146,14 @@ export function showGraph(data: any) {
     typeof (window as any).d3.forceManyBody === "function"
   ) {
     const d3 = (window as any).d3;
-    graphInstance.d3Force("charge", d3.forceManyBody().strength(-900));
+    graphInstance.d3Force("charge", d3.forceManyBody().strength(-1200));
     graphInstance.d3Force(
       "link",
       d3
         .forceLink()
         .id((d: any) => d.name)
-        .distance(220)
-        .strength(0.9)
+        .distance(300)
+        .strength(0.6)
     );
 
     if (typeof d3.forceCollide === "function") {
@@ -161,7 +161,11 @@ export function showGraph(data: any) {
         "collision",
         d3
           .forceCollide()
-          .radius(() => 90)
+          .radius((node: any) => {
+            const collisionRadius =
+              Math.max(nodeWidth / 2, node.height / 2) + 10;
+            return collisionRadius;
+          })
           .strength(0.9)
       );
     }
@@ -199,9 +203,15 @@ export function showGraph(data: any) {
     graphInstance.linkDirectionalArrowLength(6).linkDirectionalArrowRelPos(1);
   }
 
-  const zoomInButton = document.getElementById("schema-controls-zoom-in") as HTMLButtonElement;
-  const zoomOutButton = document.getElementById("schema-controls-zoom-out") as HTMLButtonElement;
-  const centerButton = document.getElementById("schema-controls-center") as HTMLButtonElement;
+  const zoomInButton = document.getElementById(
+    "schema-controls-zoom-in"
+  ) as HTMLButtonElement;
+  const zoomOutButton = document.getElementById(
+    "schema-controls-zoom-out"
+  ) as HTMLButtonElement;
+  const centerButton = document.getElementById(
+    "schema-controls-center"
+  ) as HTMLButtonElement;
 
   zoomInButton.addEventListener("click", () => {
     graphInstance.zoom(graphInstance.zoom() * 1.1);
