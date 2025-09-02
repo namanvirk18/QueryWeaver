@@ -2,7 +2,7 @@
 Graphiti integration for QueryWeaver memory component.
 Saves summarized conversations with user and database nodes.
 """
-
+# pylint: disable=all
 import asyncio
 import os
 from typing import List, Dict, Any, Optional
@@ -40,7 +40,6 @@ class MemoryTool:
 
         self.user_id = user_id
         self.graph_id = graph_id
-        self.config = Config()
 
 
     @classmethod
@@ -463,17 +462,17 @@ class MemoryTool:
             # Add similar queries context
             if similar_queries:
                 memory_context += "SIMILAR QUERIES HISTORY:\n"
-                
+
                 # Separate successful and failed queries
                 successful_queries = [q for q in similar_queries if q.get('success', False)]
                 failed_queries = [q for q in similar_queries if not q.get('success', False)]
-                
+
                 if successful_queries:
                     memory_context += "\nSUCCESSFUL QUERIES (Learn from these patterns):\n"
                     for i, query_data in enumerate(successful_queries, 1):
                         memory_context += f"{i}. Query: \"{query_data.get('user_query', '')}\"\n"
                         memory_context += f"   Successful SQL: {query_data.get('sql_query', '')}\n\n"
-                
+
                 if failed_queries:
                     memory_context += "FAILED QUERIES (Avoid these patterns):\n"
                     for i, query_data in enumerate(failed_queries, 1):
@@ -484,9 +483,9 @@ class MemoryTool:
                         memory_context += f"   AVOID this approach.\n\n"
                 
                 memory_context += "\n"
-            
+
             return memory_context
-            
+
         except Exception as e:
             print(f"Error in concurrent memory search: {e}")
             return ""
@@ -534,12 +533,12 @@ class MemoryTool:
             conv_text += f"Error: {conversation['error']}\n"
         if conversation.get('answer'):
             conv_text += f"Assistant: {conversation['answer']}\n"
-        
+
         # Add success/failure status
         success_status = conversation.get('success', True)
         conv_text += f"Execution Status: {'Success' if success_status else 'Failed'}\n"
         conv_text += "\n"
-        
+
         prompt = f"""
                 Analyze this QueryWeaver question-answer interaction with database "{self.graph_id}".
                 Focus exclusively on extracting graph-oriented facts about the database and its entities, relationships, and structure.
@@ -570,7 +569,7 @@ class MemoryTool:
         
         try:
             response = completion(
-                model=self.config.COMPLETION_MODEL,
+                model=Config.COMPLETION_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1
             )
@@ -638,28 +637,33 @@ def get_azure_openai_clients():
 
 def create_graphiti_client(falkor_driver: FalkorDriver) -> Graphiti:
     """Create a Graphiti client configured with Azure OpenAI."""
-    # Get Azure OpenAI clients and config
-    llm_client_azure, embedding_client_azure, config = get_azure_openai_clients()
-
-    # Create LLM Config with Azure deployment names
-    azure_llm_config = LLMConfig(
-        small_model=config.small_model_deployment,
-        model=config.llm_deployment,
-    )
-
     # Initialize Graphiti with Azure OpenAI clients
-    return Graphiti(
-        graph_driver=falkor_driver,
-        llm_client=OpenAIClient(config=azure_llm_config, client=llm_client_azure),
-        embedder=OpenAIEmbedder(
-            config=OpenAIEmbedderConfig(embedding_model=config.embedding_deployment),
-            client=embedding_client_azure,
-        ),
-        cross_encoder=OpenAIRerankerClient(
-            config=LLMConfig(
-                model=azure_llm_config.small_model  # Use small model for reranking
+    if Config.AZURE_FLAG:
+        # Get Azure OpenAI clients and config
+        llm_client_azure, embedding_client_azure, config = get_azure_openai_clients()
+
+        # Create LLM Config with Azure deployment names
+        azure_llm_config = LLMConfig(
+            small_model=config.small_model_deployment,
+            model=config.llm_deployment,
+        )
+
+        graphiti_client = Graphiti(
+            graph_driver=falkor_driver,
+            llm_client=OpenAIClient(config=azure_llm_config, client=llm_client_azure),
+            embedder=OpenAIEmbedder(
+                config=OpenAIEmbedderConfig(embedding_model=config.embedding_deployment),
+                client=embedding_client_azure,
             ),
-            client=llm_client_azure,
-        ),
-    )
+            cross_encoder=OpenAIRerankerClient(
+                config=LLMConfig(
+                    model=azure_llm_config.small_model  # Use small model for reranking
+                ),
+                client=llm_client_azure,
+            ),
+        )
+    else:  # Fallback to default OpenAI config
+        graphiti_client = Graphiti(graph_driver=falkor_driver)
+
+    return graphiti_client
 

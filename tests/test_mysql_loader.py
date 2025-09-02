@@ -1,4 +1,5 @@
 """Tests for MySQL loader functionality."""
+# pylint: disable=protected-access
 
 import asyncio
 import datetime

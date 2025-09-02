@@ -9,7 +9,7 @@ from api.extensions import db
 from api.utils import generate_db_description
 
 
-async def load_to_graph(
+async def load_to_graph(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     graph_id: str,
     entities: dict,
     relationships: dict,
@@ -49,7 +49,7 @@ async def load_to_graph(
             {"size": vec_len},
         )
         await graph.query("CREATE INDEX FOR (p:Table) ON (p.name)")
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error creating vector indices: {str(e)}")
 
     db_des = generate_db_description(db_name=db_name, table_names=list(entities.keys()))
@@ -88,7 +88,7 @@ async def load_to_graph(
         )
 
         # Batch embeddings for table columns
-        # TODO: Check if the embedding model and description are correct \
+        # TODO: Check if the embedding model and description are correct  # pylint: disable=fixme
         # (without 2 sources of truth)
         batch_flag = True
         col_descriptions = table_info.get("col_descriptions")
@@ -107,7 +107,7 @@ async def load_to_graph(
 
                     embedding_result = embedding_model.embed(batch)
                     embed_columns.extend(embedding_result)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 print(f"Error creating embeddings: {str(e)}")
                 batch_flag = False
 
@@ -179,6 +179,6 @@ async def load_to_graph(
                         "note": note,
                     },
                 )
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 print(f"Warning: Could not create relationship: {str(e)}")
                 continue

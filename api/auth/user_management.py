@@ -73,7 +73,7 @@ async def delete_user_token(api_token: str):
         logging.error("Error deleting user token: %s", e)
 
 
-async def ensure_user_in_organizations(  # pylint: disable=too-many-arguments
+async def ensure_user_in_organizations(  # pylint: disable=too-many-arguments, disable=too-many-positional-arguments
     provider_user_id: str,
     email: str,
     name: str,

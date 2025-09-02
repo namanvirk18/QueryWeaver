@@ -1,6 +1,7 @@
 """
 Home Page Object for QueryWeaver application.
 """
+# pylint: disable=broad-exception-caught
 from tests.e2e.pages.base_page import BasePage
 
 
@@ -13,13 +14,14 @@ class HomePage(BasePage):
     MESSAGE_INPUT = "input[type='text'], textarea"
     SEND_BUTTON = "button[type='submit']"
     GRAPH_SELECTOR = "select[name='graph']"
-    FILE_UPLOAD = "input[type='file']"
+    FILE_UPLOAD = "#schema-upload"  # Updated to use correct ID from UI analysis
     LOADING_INDICATOR = ".loading"
 
     def navigate_to_home(self):
         """Navigate to the home page."""
-        self.navigate_to("/chat")
-        self.wait_for_page_load()
+        self.navigate_to("/")
+        # Wait for the page content to be loaded, not all resources
+        self.page.wait_for_load_state("domcontentloaded", timeout=30000)
 
     def is_authenticated(self):
         """Check if user is authenticated."""
@@ -32,6 +34,8 @@ class HomePage(BasePage):
 
     def click_login(self):
         """Click the login button."""
+        # Wait for the login button to be visible before clicking
+        self.page.wait_for_selector(self.LOGIN_BUTTON, state="visible", timeout=5000)
         self.page.click(self.LOGIN_BUTTON)
 
     def has_chat_interface(self):
@@ -52,6 +56,12 @@ class HomePage(BasePage):
 
     def upload_file(self, file_path):
         """Upload a file."""
+        # The file input might not be visible, but we can still set files on it
+        file_input = self.page.query_selector(self.FILE_UPLOAD)
+        if not file_input:
+            raise Exception("File upload input not found") # pylint: disable=broad-exception-raised
+
+        # Set the file even if input is not visible (common for file inputs)
         self.page.set_input_files(self.FILE_UPLOAD, file_path)
 
     def select_graph(self, graph_name):

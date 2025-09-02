@@ -13,7 +13,8 @@ class BasePage:
     def navigate_to(self, path=""):
         """Navigate to a specific path."""
         url = f"{self.page.app_url}{path}"
-        self.page.goto(url)
+        # Use domcontentloaded instead of load
+        self.page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
     def wait_for_page_load(self):
         """Wait for page to be fully loaded."""

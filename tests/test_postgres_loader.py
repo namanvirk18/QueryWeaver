@@ -87,7 +87,7 @@ class TestPostgreSQLLoader(unittest.TestCase):
             ],
             # Second call: row count for 'id' column
             [(100, 100)],
-            # Third call: row count for 'name' column  
+            # Third call: row count for 'name' column
             [(100, 50)],
             # Fourth call: row count for 'email' column
             [(100, 80)]

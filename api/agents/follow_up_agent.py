@@ -30,14 +30,13 @@ Example responses (personal queries):
 """
 
 
-class FollowUpAgent(BaseAgent):
+class FollowUpAgent(BaseAgent):  # pylint: disable=too-few-public-methods
     """Agent for generating helpful follow-up questions when queries fail or are off-topic."""
 
     def generate_follow_up_question(
-        self, 
+        self,
         user_question: str,
-        analysis_result: dict,
-        found_tables: list = None
+        analysis_result: dict
     ) -> str:
         """
         Generate helpful follow-up questions based on failed SQL translation.
@@ -51,13 +50,16 @@ class FollowUpAgent(BaseAgent):
         Returns:
             str: Conversational follow-up response
         """
-        
+
         # Extract key information from analysis result
-        is_translatable = analysis_result.get("is_sql_translatable", False) if analysis_result else False
+        is_translatable = (
+            analysis_result.get("is_sql_translatable", False)
+            if analysis_result else False
+        )
         missing_info = analysis_result.get("missing_information", []) if analysis_result else []
         ambiguities = analysis_result.get("ambiguities", []) if analysis_result else []
-        explanation = analysis_result.get("explanation", "No detailed explanation available") if analysis_result else "No analysis result available"
-        
+        explanation = (analysis_result.get("explanation", "No detailed explanation available")
+                        if analysis_result else "No analysis result available")
         # Prepare the prompt
         prompt = FOLLOW_UP_GENERATION_PROMPT.format(
             QUESTION=user_question,
@@ -66,17 +68,17 @@ class FollowUpAgent(BaseAgent):
             AMBIGUITIES=ambiguities,
             EXPLANATION=explanation
         )
-        
+
         try:
             completion_result = completion(
                 model=Config.COMPLETION_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.9
             )
-            
+
             response = completion_result.choices[0].message.content.strip()
             return response
-            
-        except Exception as e:
+
+        except Exception: # pylint: disable=broad-exception-caught
             # Fallback response if LLM call fails
-            return "I'm having trouble generating a follow-up question right now. Could you try rephrasing your question or providing more specific details about what you're looking for?"
+            return "Sorry, I couldn't generate a follow-up. Could you clarify your question a bit?"

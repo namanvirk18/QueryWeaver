@@ -48,24 +48,6 @@ def _get_provider_client(request: Request, provider: str):
         raise HTTPException(status_code=500, detail=f"OAuth provider {provider} not configured")
     return client
 
-@auth_router.get("/chat", name="auth.chat", response_class=HTMLResponse)
-async def chat(request: Request) -> HTMLResponse:
-    """Explicit chat route (renders main chat UI)."""
-    user_info, is_authenticated = await validate_user(request)
-
-    if not is_authenticated or not user_info:
-        is_authenticated = False
-        user_info = None
-
-    return templates.TemplateResponse(
-        "chat.j2",
-        {
-            "request": request,
-            "is_authenticated": is_authenticated,
-            "user_info": user_info,
-        },
-    )
-
 def _build_callback_url(request: Request, path: str) -> str:
     """Build absolute callback URL, honoring OAUTH_BASE_URL if provided."""
     base_override = os.getenv("OAUTH_BASE_URL")
@@ -77,30 +59,23 @@ def _build_callback_url(request: Request, path: str) -> str:
 # ---- Routes ----
 @auth_router.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
-    """Handle the home page, rendering the landing page for unauthenticated users and the chat page for authenticated users."""
+    """
+    Handle the home page, rendering the landing page for unauthenticated users 
+    and the chat page for authenticated users.
+    """
     user_info, is_authenticated_flag = await validate_user(request)
-
-    if is_authenticated_flag or user_info:
-        return templates.TemplateResponse(
-            "chat.j2",
-            {
-                "request": request,
-                "is_authenticated": True,
-                "user_info": user_info
-            }
-        )
-
     return templates.TemplateResponse(
-        "landing.j2", 
+        "chat.j2",
         {
-            "request": request, 
-            "is_authenticated": False, 
-            "user_info": None
+            "request": request,
+            "is_authenticated": is_authenticated_flag,
+            "user_info": user_info
         }
     )
 
 @auth_router.get("/login", response_class=RedirectResponse)
 async def login_page(_: Request) -> RedirectResponse:
+    """Redirect to Google login page."""
     return RedirectResponse(url="/login/google", status_code=status.HTTP_302_FOUND)
 
 
@@ -166,7 +141,7 @@ async def google_authorized(request: Request) -> RedirectResponse:
                 # Call the registered handler (await if async)
                 await handler('google', user_data, api_token)
 
-                redirect = RedirectResponse(url="/chat", status_code=302)
+                redirect = RedirectResponse(url="/", status_code=302)
                 redirect.set_cookie(
                     key="api_token",
                     value=api_token,
@@ -185,12 +160,13 @@ async def google_authorized(request: Request) -> RedirectResponse:
         raise HTTPException(status_code=400, detail="Failed to get user info from Google")
 
     except Exception as e:
-        logging.error(f"Google OAuth authentication failed: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
+        logging.error("Google OAuth authentication failed: %s", str(e))  # nosemgrep
+        raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}") from e
 
 
 @auth_router.get("/login/google/callback", response_class=RedirectResponse)
 async def google_callback_compat(request: Request) -> RedirectResponse:
+    """Handle Google OAuth callback redirect for compatibility."""
     qs = f"?{request.url.query}" if request.url.query else ""
     redirect = f"/login/google/authorized{qs}"
     return RedirectResponse(url=redirect, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
@@ -198,6 +174,7 @@ async def google_callback_compat(request: Request) -> RedirectResponse:
 
 @auth_router.get("/login/github",  name="github.login", response_class=RedirectResponse)
 async def login_github(request: Request) -> RedirectResponse:
+    """Initiate GitHub OAuth login flow."""
     github = _get_provider_client(request, "github")
     redirect_uri = _build_callback_url(request, "login/github/authorized")
 
@@ -214,6 +191,7 @@ async def login_github(request: Request) -> RedirectResponse:
 
 @auth_router.get("/login/github/authorized", response_class=RedirectResponse)
 async def github_authorized(request: Request) -> RedirectResponse:
+    """Handle GitHub OAuth callback and create user session."""
     try:
         github = _get_provider_client(request, "github")
         token = await github.authorize_access_token(request)
@@ -221,7 +199,7 @@ async def github_authorized(request: Request) -> RedirectResponse:
         # Fetch GitHub user info
         resp = await github.get("user", token=token)
         if resp.status_code != 200:
-            logging.error("Failed to fetch GitHub user info: %s", resp.text)
+            logging.error("Failed to fetch GitHub user info: %s", resp.text)  # nosemgrep
             return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
 
         user_info = resp.json()
@@ -254,7 +232,7 @@ async def github_authorized(request: Request) -> RedirectResponse:
                 # Call the registered handler (await if async)
                 await handler('github', user_data, api_token)
 
-                redirect = RedirectResponse(url="/chat", status_code=302)
+                redirect = RedirectResponse(url="/", status_code=302)
                 redirect.set_cookie(
                     key="api_token",
                     value=api_token,
@@ -273,12 +251,13 @@ async def github_authorized(request: Request) -> RedirectResponse:
         raise HTTPException(status_code=400, detail="Failed to get user info from Github")
 
     except Exception as e:
-        logging.error(f"GitHub OAuth authentication failed: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
+        logging.error("GitHub OAuth authentication failed: %s", str(e))  # nosemgrep
+        raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}") from e
 
 
 @auth_router.get("/login/github/callback", response_class=RedirectResponse)
 async def github_callback_compat(request: Request) -> RedirectResponse:
+    """Handle GitHub OAuth callback redirect for compatibility."""
     qs = f"?{request.url.query}" if request.url.query else ""
     redirect = f"/login/github/authorized{qs}"
     return RedirectResponse(url=redirect, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
@@ -293,7 +272,7 @@ async def logout(request: Request) -> RedirectResponse:
     if api_token:
         resp.delete_cookie("api_token")
         await delete_user_token(api_token)
-        
+
     return resp
 
 # ---- Hook for app factory ----

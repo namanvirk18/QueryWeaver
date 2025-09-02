@@ -24,7 +24,7 @@ from api.routes.tokens import tokens_router
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-class SecurityMiddleware(BaseHTTPMiddleware):
+class SecurityMiddleware(BaseHTTPMiddleware): # pylint: disable=too-few-public-methods
     """Middleware for security checks including static file access"""
 
     STATIC_PREFIX = '/static/'
@@ -103,10 +103,10 @@ def create_app():
         mcp.mount_http()
 
     @app.exception_handler(Exception)
-    async def handle_oauth_error(request: Request, exc: Exception):
+    async def handle_oauth_error(request: Request, exc: Exception): # pylint: disable=unused-argument
         """Handle OAuth-related errors gracefully"""
         # Check if it's an OAuth-related error
-        # TODO check this scenario
+        # TODO check this scenario, pylint: disable=fixme
         if "token" in str(exc).lower() or "oauth" in str(exc).lower():
             logging.warning("OAuth error occurred: %s", exc)
             return RedirectResponse(url="/", status_code=302)
