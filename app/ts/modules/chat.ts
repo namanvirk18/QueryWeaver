@@ -119,6 +119,8 @@ function handleStreamMessage(step: any) {
         moveLoadingMessageToBottom();
     } else if (step.type === 'final_result') {
         handleFinalResult(step);
+    } else if (step.type === 'sql_query') {
+        handleFinalResult(step, true);
     } else if (step.type === 'followup_questions') {
         handleFollowupQuestions(step);
     } else if (step.type === 'query_result') {
@@ -138,7 +140,7 @@ function handleStreamMessage(step: any) {
     }
 }
 
-function handleFinalResult(step: any) {
+function handleFinalResult(step: any, isQuery = false) {
     if (DOM.confValue) DOM.confValue.textContent = `${step.conf}%`;
 
     [[step.exp, DOM.expValue], [step.miss, DOM.missValue], [step.amb, DOM.ambValue]].forEach(([value, element]: any) => {
@@ -166,7 +168,7 @@ function handleFinalResult(step: any) {
 
     const message = step.message || JSON.stringify(step.data, null, 2);
     if (step.is_valid) {
-        addMessage(message, "final-result");
+        addMessage(message, "final-result", isQuery);
     } else {
         addMessage("Sorry, we couldn't generate a valid SQL query. Please try rephrasing your question or add more details. For help, check the explanation window.", "followup");
     }
@@ -182,8 +184,7 @@ function handleFollowupQuestions(step: any) {
 
 function handleQueryResult(step: any) {
     if (step.data) {
-        console.log(step.data);
-        addMessage("Query Result", "query-final-result", null, step.data);
+        addMessage("Query Result", "query-final-result", false, null, step.data);
     } else {
         addMessage('No results found for the query.');
     }

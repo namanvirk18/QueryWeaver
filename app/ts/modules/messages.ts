@@ -14,6 +14,7 @@ export function addMessage(
     | "final-result"
     | "query-final-result"
     | "loading" = "bot",
+  isQuery: boolean = false,
   userInfo: { picture?: string; name?: string } | null = null,
   queryResult: any = null
 ) {
@@ -54,6 +55,7 @@ export function addMessage(
       state.result_history.push(message);
       messageDivContainer.className += " final-result-message-container";
       messageDiv.className += " final-result-message";
+      if (isQuery) messageDiv.classList.add("query-text");
       break;
     case "query-final-result":
       messageDivContainer.className += " final-result-message-container";

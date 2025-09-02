@@ -395,7 +395,6 @@
   padding: 0.6em 0.8em;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  font-family: monospace;
   color: var(--text-primary);
   background: var(--falkor-quaternary);
   overflow-x: auto;
@@ -471,7 +470,6 @@
 .token-input {
   flex: 1;
   padding: 0.8em;
-  font-family: 'Courier New', monospace;
   font-size: 0.9em;
   border: 1px solid var(--border-color);
   border-radius: 6px;
