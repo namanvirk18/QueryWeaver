@@ -9,13 +9,9 @@ matrix:
       - .github/wordlist.txt
     encoding: utf-8
   pipeline:
-    # Strip out Markdown noise
+    # Strip out Markdown noise (code blocks, links, etc.)
     - pyspelling.filters.markdown
-    # Ignore URLs (https://, etc.)
-    - pyspelling.filters.url
-    # Ignore emails (foo@bar.com)
-    - pyspelling.filters.email
-    # Ignore HTML tags/attributes inside Markdown
+    # Strip out HTML tags/attributes inside Markdown
     - pyspelling.filters.html
   aspell:
     lang: en
