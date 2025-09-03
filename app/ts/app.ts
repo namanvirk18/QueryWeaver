@@ -26,7 +26,7 @@ import { initLeftToolbar } from "./modules/left_toolbar";
 import { setupTextareaAutoResize } from "./modules/input";
 
 async function loadAndShowGraph(selected: string | undefined) {
-  if (!selected) return;
+  if (!selected || selected === "Select Database") return;
   try {
     const resp = await fetch(`/graphs/${encodeURIComponent(selected)}/data`);
     if (!resp.ok) {
