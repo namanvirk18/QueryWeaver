@@ -11,7 +11,7 @@ matrix:
   pipeline:
   - pyspelling.filters.markdown:
       markdown_extensions:
-      - markdown.extensions.extra:
+      - markdown.extensions.extra
   - pyspelling.filters.html:
       comments: false
       attributes:
@@ -23,6 +23,10 @@ matrix:
       - blockquote
       - img
       - table
+  - pyspelling.filters.regex:
+      expressions:
+        # Ignore random alphanumeric tokens (6+ chars, mixed case)
+        - '[A-Za-z0-9]{6,}'
   sources:
   - '*.md'
   - 'docs/*.md'
