@@ -1,32 +1,35 @@
+<div align="center">  
+  <h1>QueryWeaver</h1>
+
+**REST API · MCP · Graph-powered** 
+
+QueryWeaver is an **open-source Text2SQL** tool that converts plain-English questions into SQL using **graph-powered schema understanding**. It helps you ask databases natural-language questions and returns SQL and results.
+
+Connect and ask questions: [![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?&logo=discord&logoColor=white)](https://discord.gg/b32KEzMzce)
+
 [![Try Free](https://img.shields.io/badge/Try%20Free-FalkorDB%20Cloud-FF8101?labelColor=FDE900&link=https://app.falkordb.cloud)](https://app.falkordb.cloud)
 [![Dockerhub](https://img.shields.io/docker/pulls/falkordb/queryweaver?label=Docker)](https://hub.docker.com/r/falkordb/queryweaver/)
-[![Discord](https://img.shields.io/discord/1146782921294884966?style=flat-square)](https://discord.com/invite/6M4QwDXn2w)
 [![Tests](https://github.com/FalkorDB/QueryWeaver/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/FalkorDB/QueryWeaver/actions/workflows/tests.yml)
 [![Swagger UI](https://img.shields.io/badge/API-Swagger-11B48A?logo=swagger&logoColor=white)](https://app.queryweaver.ai/docs)
+</div>
 
-# QueryWeaver
+![queryweaver-demo-video-ui](https://github.com/user-attachments/assets/b66018cb-0e42-4907-8ac1-c169762ff22d)
 
-QueryWeaver is an open-source Text2SQL tool that converts plain-English questions into SQL using graph-powered schema understanding. It helps you ask databases natural-language questions and returns SQL and results.
-
-![Screenshot](https://github.com/user-attachments/assets/e5a577a0-c157-44ff-9aeb-3522a757b536)
-
-TL;DR
-- Try quickly with Docker: `docker run -p 5000:5000 -it falkordb/queryweaver`
-- Develop locally: see "Development" section below
-
-## Quick start — Docker (recommended for evaluation)
-
-Run the official image locally (no local Python or Node required):
-
+## Get Started
+### Docker
+> 💡 Recommended for evaluation purposes (Local Python or Node are not required)
 ```bash
 docker run -p 5000:5000 -it falkordb/queryweaver
 ```
 
-Open: http://localhost:5000
 
-### Prefer using a .env file (recommended)
+Launch: http://localhost:5000
 
-Create a local `.env` by copying `.env.example` and pass it to Docker. This is the simplest way to provide all required configuration:
+---
+
+### Use an .env file (Recommended)
+
+Create a local `.env` by copying `.env.example` and passing it to Docker. This is the simplest way to provide all required configuration:
 
 ```bash
 cp .env.example .env
@@ -34,7 +37,7 @@ cp .env.example .env
 docker run -p 5000:5000 --env-file .env falkordb/queryweaver
 ```
 
-### Or pass individual environment variables
+### Alternative: Pass individual environment variables
 
 If you prefer to pass variables on the command line, use `-e` flags (less convenient for many variables):
 
@@ -50,9 +53,9 @@ docker run -p 5000:5000 -it \
   falkordb/queryweaver
 ```
 
-Note: To use OpenAI directly instead of Azure OpenAI, replace `AZURE_API_KEY` with `OPENAI_API_KEY` in the above command.
+> Note: To use OpenAI directly instead of Azure OpenAI, replace `AZURE_API_KEY` with `OPENAI_API_KEY` in the above command.
 
-For a full list of configuration options, consult `.env.example`.
+> For a full list of configuration options, consult `.env.example`.
 
 ## MCP server: host or connect (optional)
 
