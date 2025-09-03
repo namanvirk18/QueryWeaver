@@ -74,7 +74,7 @@ function setupEventListeners() {
     const messageInput = DOM.messageInput;
     if (!submitButton || !messageInput) return;
     const selected = getSelectedGraph();
-    if (messageInput.value && selected && selected !== "Select database") {
+    if (messageInput.value && selected && selected !== "Select Database") {
       submitButton.disabled = false;
     } else {
       submitButton.disabled = true;
