@@ -21,12 +21,15 @@ from api.loaders.postgres_loader import PostgresLoader
 from api.loaders.mysql_loader import MySQLLoader
 from api.memory.graphiti_tool import MemoryTool
 
+from api.routes.tokens import UNAUTHORIZED_RESPONSE
+
 # Use the same delimiter as in the JavaScript
 MESSAGE_DELIMITER = "|||FALKORDB_MESSAGE_BOUNDARY|||"
 
 graphs_router = APIRouter(tags=["Graphs & Databases"])
 
 GENERAL_PREFIX = os.getenv("GENERAL_PREFIX")
+
 
 class GraphData(BaseModel):
     """Graph data model.
@@ -110,7 +113,7 @@ def _graph_name(request: Request, graph_id:str) -> str:
     return f"{request.state.user_id}_{graph_id}"
 
 @graphs_router.get("", operation_id="list_databases", responses={
-    401: {"description": "Unauthorized - Please log in or provide a valid API token"}
+    401: UNAUTHORIZED_RESPONSE
 })
 @token_required
 async def list_graphs(request: Request):
@@ -132,7 +135,7 @@ async def list_graphs(request: Request):
     return JSONResponse(content=filtered_graphs)
 
 @graphs_router.get("/{graph_id}/data", operation_id="database_schema", responses={
-    401: {"description": "Unauthorized - Please log in or provide a valid API token"}
+    401: UNAUTHORIZED_RESPONSE
 })
 @token_required
 async def get_graph_data(request: Request, graph_id: str):  # pylint: disable=too-many-locals,too-many-branches
@@ -231,7 +234,7 @@ async def get_graph_data(request: Request, graph_id: str):  # pylint: disable=to
 
 
 @graphs_router.post("", responses={
-    401: {"description": "Unauthorized - Please log in or provide a valid API token"}
+    401: UNAUTHORIZED_RESPONSE
 })
 @token_required
 async def load_graph(request: Request, data: GraphData = None, file: UploadFile = File(None)): # pylint: disable=unused-argument
@@ -267,7 +270,7 @@ async def load_graph(request: Request, data: GraphData = None, file: UploadFile 
         raise HTTPException(status_code=415, detail="Unsupported Content-Type")
 
 @graphs_router.post("/{graph_id}", operation_id="query_database", responses={
-    401: {"description": "Unauthorized - Please log in or provide a valid API token"}
+    401: UNAUTHORIZED_RESPONSE
 })
 @token_required
 async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest):  # pylint: disable=too-many-statements
@@ -661,7 +664,7 @@ What this will do:
 
 
 @graphs_router.post("/{graph_id}/confirm", responses={
-    401: {"description": "Unauthorized - Please log in or provide a valid API token"}
+    401: UNAUTHORIZED_RESPONSE
 })
 @token_required
 async def confirm_destructive_operation(
@@ -825,7 +828,7 @@ async def confirm_destructive_operation(
 
 
 @graphs_router.post("/{graph_id}/refresh", responses={
-    401: {"description": "Unauthorized - Please log in or provide a valid API token"}
+    401: UNAUTHORIZED_RESPONSE
 })
 @token_required
 async def refresh_graph_schema(request: Request, graph_id: str):
@@ -856,7 +859,7 @@ async def refresh_graph_schema(request: Request, graph_id: str):
         raise HTTPException(status_code=500, detail="Internal server error while refreshing schema") # pylint: disable=raise-missing-from
 
 @graphs_router.delete("/{graph_id}", responses={
-    401: {"description": "Unauthorized - Please log in or provide a valid API token"}
+    401: UNAUTHORIZED_RESPONSE
 })
 @token_required
 async def delete_graph(request: Request, graph_id: str):

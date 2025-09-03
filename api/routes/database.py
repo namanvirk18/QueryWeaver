@@ -12,6 +12,8 @@ from api.auth.user_management import token_required
 from api.loaders.postgres_loader import PostgresLoader
 from api.loaders.mysql_loader import MySQLLoader
 
+from api.routes.tokens import UNAUTHORIZED_RESPONSE
+
 database_router = APIRouter(tags=["Database Connection"])
 
 # Use the same delimiter as in the JavaScript frontend for streaming chunks
@@ -27,7 +29,7 @@ class DatabaseConnectionRequest(BaseModel):
     url: str
 
 @database_router.post("/database", operation_id="connect_database", responses={
-    401: {"description": "Unauthorized - Please log in or provide a valid API token"}
+    401: UNAUTHORIZED_RESPONSE
 })
 @token_required
 async def connect_database(request: Request, db_request: DatabaseConnectionRequest):

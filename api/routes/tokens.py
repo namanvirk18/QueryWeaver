@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from api.auth.user_management import token_required
 from api.extensions import db
 
+UNAUTHORIZED_RESPONSE = {"description": "Unauthorized - Please log in or provide a valid API token"}
 
 # Router
 tokens_router = APIRouter(tags=["API Tokens"])
@@ -25,7 +26,7 @@ class TokenListResponse(BaseModel):
     tokens: List[TokenListItem]
 
 @tokens_router.post("/generate", response_model=TokenListItem, responses={
-    401: {"description": "Unauthorized - Please log in or provide a valid API token"}
+    401: UNAUTHORIZED_RESPONSE
 })
 @token_required
 async def generate_token(request: Request) -> TokenListItem:
@@ -70,7 +71,7 @@ async def generate_token(request: Request) -> TokenListItem:
         ) from e
 
 @tokens_router.get("/list", response_model=TokenListResponse, responses={
-    401: {"description": "Unauthorized - Please log in or provide a valid API token"}
+    401: UNAUTHORIZED_RESPONSE
 })
 @token_required
 async def list_tokens(request: Request) -> TokenListResponse:
@@ -110,7 +111,7 @@ async def list_tokens(request: Request) -> TokenListResponse:
         ) from e
 
 @tokens_router.delete("/{token_id}", responses={
-    401: {"description": "Unauthorized - Please log in or provide a valid API token"}
+    401: UNAUTHORIZED_RESPONSE
 })
 @token_required
 async def delete_token(request: Request, token_id: str) -> JSONResponse:
