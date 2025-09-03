@@ -1,7 +1,21 @@
 /* Mobile Responsive Styles */
 
+/* Hide sidebar close button on desktop */
+@media (min-width: 769px) {
+  .sidebar-close-btn {
+    display: none !important;
+  }
+}
+
 /* Layout Responsive */
 @media (max-width: 768px) {
+
+  .github-link {
+    height: 40px;
+    width: 40px;
+    align-items: center;
+    justify-content: center;
+  }
 
   /* When left toolbar is open, push content to make room */
   body.left-toolbar-open .chat-container {
@@ -21,13 +35,27 @@
     overflow-x: hidden;
     box-sizing: border-box;
     transition: margin-left 220ms ease;
+    margin-left: 0;
+  }
+
+  .menu-item {
+    flex-wrap: wrap;
+  }
+
+  .menu-item p {
+    font-size: 12px;
+  }
+
+  .db-modal-content {
+    min-width: 0px;
+    max-width: 90%;
+    padding: 40px;
   }
 
   /* Adjust container when toolbar is open */
   body.left-toolbar-open #container {
-    margin-left: 48px;
     width: calc(100% - 48px);
-    max-width: calc(100vw - 48px);
+    margin-left: 48px;
   }
 
   /* Prevent any background showing behind the shifted content */
@@ -58,24 +86,64 @@
 
 /* Mobile: Menu overlays content (no pushing) */
 @media (max-width: 768px) {
-  #menu-container.open~#chat-container {
-    margin-left: 0;
+  .resize-handle {
+    display: none;
   }
-}
 
-/* Menu Responsive */
-@media (max-width: 768px) {
   .sidebar-container {
     position: fixed;
     top: 0;
-    left: 0;
-    height: 100vh;
-    z-index: 999;
+    bottom: 33px;
+    left: 48px;
+    z-index: 10;
   }
 
   .sidebar-container.open {
-    width: 80vw;
-    padding: 15px;
+    min-width: 80dvw;
+    z-index: 10;
+  }
+
+  #container:has(.sidebar-container.open)::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9;
+    pointer-events: auto;
+  }
+
+  /* Sidebar close button - only visible on mobile */
+  .sidebar-close-btn {
+    display: block;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 32px;
+    height: 32px;
+    background: var(--falkor-primary);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+  }
+
+  .sidebar-close-btn:hover {
+    background: var(--falkor-primary-hover, #0056b3);
+  }
+
+  .sidebar-close-btn svg {
+    width: 18px;
+    height: 18px;
   }
 }
 
@@ -110,7 +178,6 @@
     box-sizing: border-box;
     gap: 8px;
     flex-wrap: nowrap;
-    align-items: stretch;
   }
 
   /* Hide vertical separators on mobile */
@@ -129,20 +196,12 @@
     overflow: hidden;
     height: 40px;
     box-sizing: border-box;
-  }
-
-  #custom-file-upload {
     max-width: 35%;
     text-align: center;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-  }
-
-  .header-button {
-    width: 100%;
-    height: 40px;
   }
 
   .dropdown-selected {
@@ -177,10 +236,6 @@
   #custom-file-upload {
     padding: 6px 4px;
     font-size: 12px;
-    height: 36px;
-  }
-
-  .header-button {
     height: 36px;
   }
 
@@ -273,6 +328,12 @@
     padding: 6px 8px;
     font-size: 12px;
     height: 40px;
+  }
+
+  /* Hide star icon and text on mobile, show only GitHub icon */
+  .github-star-icon,
+  .github-stars-text {
+    display: none;
   }
 
   .theme-icon {
