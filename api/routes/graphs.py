@@ -868,6 +868,8 @@ async def delete_graph(request: Request, graph_id: str):
     state.
     """
     namespaced = _graph_name(request, graph_id)
+    if GENERAL_PREFIX and graph_id.startswith(GENERAL_PREFIX):
+        raise HTTPException(status_code=403, detail="Demo graphs cannot be deleted")
 
     try:
         # Select and delete the graph using the FalkorDB client API
