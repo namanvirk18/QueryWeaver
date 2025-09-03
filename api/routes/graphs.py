@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 import time
 
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File
@@ -25,6 +26,7 @@ MESSAGE_DELIMITER = "|||FALKORDB_MESSAGE_BOUNDARY|||"
 
 graphs_router = APIRouter()
 
+GENERAL_PREFIX = os.getenv("GENERAL_PREFIX")
 
 class GraphData(BaseModel):
     """Graph data model.
@@ -102,6 +104,8 @@ def _graph_name(request: Request, graph_id:str) -> str:
     if not graph_id:
         raise HTTPException(status_code=400,
                             detail="Invalid graph_id, must be less than 200 characters.")
+    if GENERAL_PREFIX and graph_id.startswith(GENERAL_PREFIX):
+        return graph_id
 
     return f"{request.state.user_id}_{graph_id}"
 
@@ -113,9 +117,16 @@ async def list_graphs(request: Request):
     """
     user_id = request.state.user_id
     user_graphs = await db.list_graphs()
+
     # Only include graphs that start with user_id + '_', and strip the prefix
     filtered_graphs = [graph[len(f"{user_id}_"):]
                        for graph in user_graphs if graph.startswith(f"{user_id}_")]
+
+    if GENERAL_PREFIX:
+        demo_graphs = [graph for graph in user_graphs
+                       if graph.startswith(GENERAL_PREFIX)]
+        filtered_graphs = filtered_graphs + demo_graphs
+
     return JSONResponse(content=filtered_graphs)
 
 @graphs_router.get("/{graph_id}/data", operation_id="database_schema")
@@ -330,7 +341,7 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest): 
         # Wait for relevancy check first
         answer_rel = await relevancy_task
 
-        if answer_rel["status"] != "On-topic":
+        if answer_rel["status"] != "On-topic": # pylint: disable=too-many-nested-blocks
             # Cancel the find task since query is off-topic
             find_task.cancel()
             try:
@@ -392,7 +403,9 @@ async def query_graph(request: Request, graph_id: str, chat_data: ChatRequest): 
 
                 destructive_ops = ['INSERT', 'UPDATE', 'DELETE', 'DROP',
                                   'CREATE', 'ALTER', 'TRUNCATE']
-                if sql_type in destructive_ops:
+                is_destructive = sql_type in destructive_ops
+                general_graph = graph_id.startswith(GENERAL_PREFIX) if GENERAL_PREFIX else False
+                if is_destructive and not general_graph:
                     # This is a destructive operation - ask for user confirmation
                     confirmation_message = f"""⚠️ DESTRUCTIVE OPERATION DETECTED ⚠️
 
@@ -446,93 +459,105 @@ What this will do:
                     return  # Stop here and wait for user confirmation
 
                 try:
-                    step = {"type": "reasoning_step",
-                            "final_response": False,
-                            "message": "Step 2: Executing SQL query"}
-                    yield json.dumps(step) + MESSAGE_DELIMITER
-
-                    # Check if this query modifies the database schema using the appropriate loader
-                    is_schema_modifying, operation_type = (
-                        loader_class.is_schema_modifying_query(sql_query)
-                    )
-
-                    query_results = loader_class.execute_sql_query(answer_an["sql_query"], db_url)
-
-                    yield json.dumps(
-                        {
-                            "type": "query_result",
-                            "data": query_results,
-                            "final_response": False
-                        }
-                    ) + MESSAGE_DELIMITER
-
-                    # If schema was modified, refresh the graph using the appropriate loader
-                    if is_schema_modifying:
+                    if is_destructive and general_graph:
+                        yield json.dumps(
+                            {
+                                "type": "error", 
+                                "final_response": True, 
+                                "message": "Destructive operation not allowed on demo graphs"
+                            }) + MESSAGE_DELIMITER
+                    else:
                         step = {"type": "reasoning_step",
                                 "final_response": False,
-                                "message": ("Step 3: Schema change detected - "
-                                            "refreshing graph...")}
+                                "message": "Step 2: Executing SQL query"}
                         yield json.dumps(step) + MESSAGE_DELIMITER
 
-                        refresh_result = await loader_class.refresh_graph_schema(
-                            graph_id, db_url)
-                        refresh_success, refresh_message = refresh_result
+                        # Check if this query modifies the database schema
+                        # using the appropriate loader
+                        is_schema_modifying, operation_type = (
+                            loader_class.is_schema_modifying_query(sql_query)
+                        )
 
-                        if refresh_success:
-                            refresh_msg = (f"✅ Schema change detected "
-                                         f"({operation_type} operation)\n\n"
-                                         f"🔄 Graph schema has been automatically "
-                                         f"refreshed with the latest database "
-                                         f"structure.")
-                            yield json.dumps(
-                                {
-                                    "type": "schema_refresh",
+                        query_results = loader_class.execute_sql_query(
+                            answer_an["sql_query"],
+                            db_url
+                        )
+
+                        yield json.dumps(
+                            {
+                                "type": "query_result",
+                                "data": query_results,
+                                "final_response": False
+                            }
+                        ) + MESSAGE_DELIMITER
+
+                        # If schema was modified, refresh the graph using the appropriate loader
+                        if is_schema_modifying:
+                            step = {"type": "reasoning_step",
                                     "final_response": False,
-                                    "message": refresh_msg,
-                                    "refresh_status": "success"
-                                }
-                            ) + MESSAGE_DELIMITER
-                        else:
-                            failure_msg = (f"⚠️ Schema was modified but graph "
-                                         f"refresh failed: {refresh_message}")
-                            yield json.dumps(
-                                {
-                                    "type": "schema_refresh",
-                                    "final_response": False,
-                                    "message": failure_msg,
-                                    "refresh_status": "failed"
-                                }
-                            ) + MESSAGE_DELIMITER
+                                    "message": ("Step 3: Schema change detected - "
+                                                "refreshing graph...")}
+                            yield json.dumps(step) + MESSAGE_DELIMITER
 
-                    # Generate user-readable response using AI
-                    step_num = "4" if is_schema_modifying else "3"
-                    step = {"type": "reasoning_step",
-                            "final_response": False,
-                           "message": f"Step {step_num}: Generating user-friendly response"}
-                    yield json.dumps(step) + MESSAGE_DELIMITER
+                            refresh_result = await loader_class.refresh_graph_schema(
+                                graph_id, db_url)
+                            refresh_success, refresh_message = refresh_result
 
-                    response_agent = ResponseFormatterAgent()
-                    user_readable_response = response_agent.format_response(
-                        user_query=queries_history[-1],
-                        sql_query=answer_an["sql_query"],
-                        query_results=query_results,
-                        db_description=db_description
-                    )
+                            if refresh_success:
+                                refresh_msg = (f"✅ Schema change detected "
+                                            f"({operation_type} operation)\n\n"
+                                            f"🔄 Graph schema has been automatically "
+                                            f"refreshed with the latest database "
+                                            f"structure.")
+                                yield json.dumps(
+                                    {
+                                        "type": "schema_refresh",
+                                        "final_response": False,
+                                        "message": refresh_msg,
+                                        "refresh_status": "success"
+                                    }
+                                ) + MESSAGE_DELIMITER
+                            else:
+                                failure_msg = (f"⚠️ Schema was modified but graph "
+                                            f"refresh failed: {refresh_message}")
+                                yield json.dumps(
+                                    {
+                                        "type": "schema_refresh",
+                                        "final_response": False,
+                                        "message": failure_msg,
+                                        "refresh_status": "failed"
+                                    }
+                                ) + MESSAGE_DELIMITER
 
-                    yield json.dumps(
-                        {
-                            "type": "ai_response",
-                            "final_response": True,
-                            "message": user_readable_response,
-                        }
-                    ) + MESSAGE_DELIMITER
+                        # Generate user-readable response using AI
+                        step_num = "4" if is_schema_modifying else "3"
+                        step = {"type": "reasoning_step",
+                                "final_response": False,
+                            "message": f"Step {step_num}: Generating user-friendly response"}
+                        yield json.dumps(step) + MESSAGE_DELIMITER
 
-                    # Log overall completion time
-                    overall_elapsed = time.perf_counter() - overall_start
-                    logging.info(
-                        "Query processing completed successfully - Total time: %.2f seconds",
-                        overall_elapsed
-                    )
+                        response_agent = ResponseFormatterAgent()
+                        user_readable_response = response_agent.format_response(
+                            user_query=queries_history[-1],
+                            sql_query=answer_an["sql_query"],
+                            query_results=query_results,
+                            db_description=db_description
+                        )
+
+                        yield json.dumps(
+                            {
+                                "type": "ai_response",
+                                "final_response": True,
+                                "message": user_readable_response,
+                            }
+                        ) + MESSAGE_DELIMITER
+
+                        # Log overall completion time
+                        overall_elapsed = time.perf_counter() - overall_start
+                        logging.info(
+                            "Query processing completed successfully - Total time: %.2f seconds",
+                            overall_elapsed
+                        )
 
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     execution_error = str(e)
