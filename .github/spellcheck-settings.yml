@@ -1,20 +1,28 @@
 matrix:
 - name: Markdown
-  sources:
-    - '*.md'
-    - 'docs/*.md'
-  default_encoding: utf-8
-  dictionary:
-    wordlists:
-      - .github/wordlist.txt
-    encoding: utf-8
-  pipeline:
-    # Strip out Markdown noise (code blocks, links, etc.)
-    - pyspelling.filters.markdown
-    # Strip out HTML tags/attributes inside Markdown
-    - pyspelling.filters.html
+  expect_match: false
   aspell:
     lang: en
     d: en_US
-    ignore-case: true
-    run-together: true
+  dictionary:
+    wordlists:
+    - .github/wordlist.txt
+    output: wordlist.dic
+  pipeline:
+  - pyspelling.filters.markdown:
+      markdown_extensions:
+      - markdown.extensions.extra:
+  - pyspelling.filters.html:
+      comments: false
+      attributes:
+      - alt
+      ignores:
+      - ':matches(code, pre)'
+      - code
+      - pre
+      - blockquote
+      - img
+      - table
+  sources:
+  - '*.md'
+  - 'docs/*.md'
