@@ -13,7 +13,7 @@ from api.config import Config
 from api.extensions import db
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
+# pylint: disable=broad-exception-caught
 
 class TableDescription(BaseModel):
     """Table Description"""
