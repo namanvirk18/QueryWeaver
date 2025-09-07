@@ -6,7 +6,6 @@ import hmac
 import logging
 import os
 import re
-import time
 import secrets
 
 from pathlib import Path
@@ -161,6 +160,17 @@ async def _set_mail_hash(email: str, password_hash: str) -> bool:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail="Internal server error"
         )
+        
+def _is_request_secure(request: Request) -> bool:
+    """Determine if the request is secure (HTTPS)."""
+    
+    # Check X-Forwarded-Proto first (proxy-aware)
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    if forwarded_proto:
+        return forwarded_proto == "https"
+    
+    # Fallback to request URL scheme
+    return request.url.scheme == "https"
 
 async def _authenticate_email_user(email: str, password: str):
     """Authenticate an email user."""
@@ -206,18 +216,18 @@ async def email_signup(request: Request, signup_data: EmailSignupRequest) -> JSO
     """Handle email/password user registration."""
     try:
         # Check if email authentication is enabled
-        if os.getenv("EMAIL_AUTH_ENABLED", "").lower() not in ["true", "1", "yes", "on"]:
-            raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="GEmail authentication is not enabled"
-        )
+        if not _is_email_auth_enabled():
+            return JSONResponse(
+                {"success": False, "error": "Email authentication is not enabled"},
+                status_code=status.HTTP_403_FORBIDDEN
+            )
 
         # Validate required fields
         if not all([signup_data.firstName, signup_data.lastName,
                     signup_data.email, signup_data.password]):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="All fields are required"
+            return JSONResponse(
+                {"success": False, "error": "All fields are required"},
+                status_code=status.HTTP_400_BAD_REQUEST
             )
 
         first_name = signup_data.firstName.strip()
@@ -227,16 +237,16 @@ async def email_signup(request: Request, signup_data: EmailSignupRequest) -> JSO
 
         # Validate email format
         if not _validate_email(email):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid email format"
+            return JSONResponse(
+                {"success": False, "error": "Invalid email format"},
+                status_code=status.HTTP_400_BAD_REQUEST
             )
 
         # Validate password strength
         if len(password) < 8:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must be at least 8 characters long"
+            return JSONResponse(
+                {"success": False, "error": "Password must be at least 8 characters long"},
+                status_code=status.HTTP_400_BAD_REQUEST
             )
 
         api_token = secrets.token_urlsafe(32)
@@ -265,15 +275,15 @@ async def email_signup(request: Request, signup_data: EmailSignupRequest) -> JSO
             key="api_token",
             value=api_token,
             httponly=True,
-            secure=True
+            secure=_is_request_secure(request)
         )
         return response
 
     except Exception as e:
         logging.error("Signup error: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Registration failed"
+        return JSONResponse(
+            {"success": False, "error": "Registration failed"},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 @auth_router.post("/login/email")
@@ -281,7 +291,7 @@ async def email_login(request: Request, login_data: EmailLoginRequest) -> JSONRe
     """Handle email/password user login."""
     try:
         # Check if email authentication is enabled
-        if os.getenv("EMAIL_AUTH_ENABLED", "").lower() not in ["true", "1", "yes", "on"]:
+        if not _is_email_auth_enabled():
             return JSONResponse(
                 {"success": False, "error": "Email authentication is not enabled"},
                 status_code=status.HTTP_403_FORBIDDEN
@@ -309,48 +319,52 @@ async def email_login(request: Request, login_data: EmailLoginRequest) -> JSONRe
 
         if not success:
             return JSONResponse(
-                {"success": False, "error": result}, 
+                {"success": False, "error": result},
                 status_code=status.HTTP_401_UNAUTHORIZED
             )
 
         # Set session data - result is a dict when success is True
         if isinstance(result, dict):
-            user_node = result.get("user")
             identity_node = result.get("identity")
 
-            # Access node properties correctly
-            user_props = (
-                user_node.properties
-                if user_node and hasattr(user_node, "properties")
-                else {}
-            )
             identity_props = (
                 identity_node.properties
                 if identity_node and hasattr(identity_node, "properties")
                 else {}
             )
-
-            request.session["user_info"] = {
-                "id": identity_props.get("provider_user_id", email),
-                "name": user_props.get("name", ""),
-                "email": user_props.get("email", email),
-                "picture": user_props.get("picture", ""),
-                "provider": "email",
+            
+            user_data = {
+                'id': identity_props.get("provider_user_id", email),
+                'email': identity_props.get('email', email),
+                'name': identity_props.get('name', ''),
+                'picture': identity_props.get('picture', ''),
             }
-            request.session["email_authenticated"] = True
-            request.session["token_validated_at"] = time.time()
 
-            return JSONResponse({"success": True, "message": "Login successful"})
-        else:
-            return JSONResponse(
-                {"success": False, "error": "Authentication failed"},
-                status_code=status.HTTP_401_UNAUTHORIZED
-            )
+            # Call the registered Google callback handler if it exists to store user data.
+            handler = getattr(request.app.state, "callback_handler", None)
+            if handler:
+                api_token = secrets.token_urlsafe(32)  # ~43 chars, hard to guess
 
+                # Call the registered handler (await if async)
+                await handler('email', user_data, api_token)
+                response = JSONResponse({"success": True}, status_code=200)
+                
+                response.set_cookie(
+                    key="api_token",
+                    value=api_token,
+                    httponly=True,
+                    secure=_is_request_secure(request)
+                )
+                return response
+            
+        return JSONResponse(
+            {"success": False, "error": "Authentication failed"},
+            status_code=status.HTTP_401_UNAUTHORIZED
+        )
     except Exception as e:
         logging.error("Login error: %s", e)
         return JSONResponse(
-            {"success": False, "error": "Login failed"}, 
+            {"success": False, "error": "Login failed"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
