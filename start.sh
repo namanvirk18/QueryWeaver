@@ -7,7 +7,7 @@ FALKORDB_HOST="${FALKORDB_HOST:-localhost}"
 FALKORDB_PORT="${FALKORDB_PORT:-6379}"
 
 # Start FalkorDB Redis server in background
-redis-server --loadmodule /var/lib/falkordb/bin/falkordb.so &
+redis-server --loadmodule /var/lib/falkordb/bin/falkordb.so | cat &
 
 # Wait until FalkorDB is ready
 echo "Waiting for FalkorDB to start on $FALKORDB_HOST:$FALKORDB_PORT..."

@@ -13,7 +13,7 @@ from api.config import Config
 from api.extensions import db
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
+# pylint: disable=broad-exception-caught
 
 class TableDescription(BaseModel):
     """Table Description"""
@@ -57,7 +57,7 @@ async def _query_graph(
     graph,
     query: str,
     params: Dict[str, Any] = None,
-    timeout: int = 120
+    timeout: int = 300
 ) -> List[Any]:
     """
     Run a graph query asynchronously and return the result set.
@@ -178,8 +178,13 @@ async def _find_tables_sphere(
                    nullable: columns.nullable
                })
     """
-    tasks = [_query_graph(graph, query, {"name": name}) for name in tables]
-    results = await asyncio.gather(*tasks)
+    try:
+        tasks = [_query_graph(graph, query, {"name": name}) for name in tables]
+        results = await asyncio.gather(*tasks)
+    except Exception as e:
+        logging.error("Error finding tables in sphere: %s", e)
+        results = []
+
     return [row for rows in results for row in rows]
 
 
@@ -206,7 +211,7 @@ async def _find_connecting_tables(
     MATCH (a:Table {name: pair[0]})
     MATCH (b:Table {name: pair[1]})
     WITH a, b
-    MATCH p = allShortestPaths((a)-[*..9]-(b))
+    MATCH p = allShortestPaths((a)-[*..6]-(b))
     UNWIND nodes(p) AS path_node
     WITH DISTINCT path_node
     WHERE 'Table' IN labels(path_node) OR
@@ -234,7 +239,12 @@ async def _find_connecting_tables(
          }) AS columns
     RETURN target_table.name, target_table.description, target_table.foreign_keys, columns
     """
-    result = await _query_graph(graph, query, {"pairs": pairs}, timeout=300)
+    try:
+        result = await _query_graph(graph, query, {"pairs": pairs}, timeout=500)
+    except Exception as e:
+        logging.error("Error finding connecting tables: %s", e)
+        result = []
+
     return result
 
 
