@@ -600,7 +600,7 @@ class MemoryTool:
                     for i, query_data in enumerate(failed_queries, 1):
                         memory_context += f"{i}. Query: \"{query_data.get('user_query', '')}\"\n"
                         memory_context += f"   Failed SQL: {query_data.get('sql_query', '')}\n"
-                        if query_data.gegraph_idt('error'):
+                        if query_data.get('error'):
                             memory_context += f"   Error: {query_data.get('error')}\n"
                         memory_context += f"   AVOID this approach.\n\n"
                 
