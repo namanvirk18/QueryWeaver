@@ -527,7 +527,7 @@ class MemoryTool:
                         fact_entry += f" ({', '.join(time_info)})"
                     
                     database_facts_text.append(fact_entry)
-            facts = "Session:\n".join(database_facts_text) if database_facts_text else ""
+            facts = "\n".join(database_facts_text) if database_facts_text else ""
             episodes = "\n".join(episodes_contents) if episodes_contents else ""
             database_context = "Previous sessions:\n" + episodes + "\n\nFacts:\n" + facts
             # Join all facts into a single string
