@@ -640,8 +640,10 @@ What this will do:
             )
 
             # Save conversation with memory tool (run in background)
-            save_task = asyncio.create_task(memory_tool.add_new_memory(full_response, [queries_history,
-                                                                                        result_history]))
+            save_task = asyncio.create_task(
+                memory_tool.add_new_memory(full_response,
+                                            [queries_history, result_history])
+            )
             # Add error handling callback to prevent silent failures
             save_task.add_done_callback(
                 lambda t: logging.error("Memory save failed: %s", t.exception())  # nosemgrep
