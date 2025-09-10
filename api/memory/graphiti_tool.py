@@ -115,9 +115,9 @@ class MemoryTool:
                 """
                 
                 await graph_driver.execute_query(user_cypher, node=user_node_data)
-                logging.info("Created user entity node: %s with UUID: %s", user_node_name, user_uuid)
+                logging.info("Created user entity node with UUID: %s", user_uuid)
             else:
-                logging.info("User entity node already exists: %s", user_node_name)
+                logging.info("User entity node already exists")
             
             # Check if database entity node already exists
             database_node_name = f"Database {database_name}"
@@ -170,8 +170,7 @@ class MemoryTool:
                     user_name=user_node_name,
                     database_name=database_node_name
                 )
-                logging.info("Created HAS_DATABASE relationship between %s and %s", user_node_name, database_node_name)
-                
+                logging.info("Created HAS_DATABASE relationship between user and %s database", database_node_name)
             except Exception as rel_error:
                 logging.error("Error creating HAS_DATABASE relationship: %s", rel_error)
                 # Don't fail the entire function if relationship creation fails
@@ -179,7 +178,7 @@ class MemoryTool:
             return True
             
         except Exception as e:
-            logging.error("Error creating entity nodes directly for user %s and database %s: %s", user_id, database_name, e)
+            logging.error("Error creating entity nodes directly: %s", e)
             return False
 
     async def update_user_information(self, conversation: Dict[str, Any], history: Tuple[List[str], List[str]]) -> bool:
@@ -457,7 +456,7 @@ class MemoryTool:
             return ""
             
         except Exception as e:
-            logging.error("Error searching user node for %s: %s", self.user_id, e)
+            logging.error("Error searching user node: %s", e)
             return ""
         
     async def extract_episode_from_rel(self, rel_result):
