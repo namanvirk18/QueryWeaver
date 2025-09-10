@@ -87,6 +87,9 @@ export function loadGraphs() {
               // onSelect
               setSelectedGraph(name);
               initChat();
+              if (typeof (window as any).updateInputState === 'function') {
+                (window as any).updateInputState();
+              }
             },
             async (name) => {
               // onDelete
@@ -216,4 +219,7 @@ export function handleFileUpload(event: Event) {
 
 export function onGraphChange() {
   initChat();
+  if (typeof (window as any).updateInputState === 'function') {
+    (window as any).updateInputState();
+  }
 }

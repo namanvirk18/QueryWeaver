@@ -53,6 +53,30 @@ async function loadAndShowGraph(selected: string | undefined) {
   }
 }
 
+function updateInputState() {
+  const submitButton = DOM.submitButton;
+  const messageInput = DOM.messageInput;
+  if (!submitButton || !messageInput) return;
+  
+  const selected = getSelectedGraph();
+  const isDatabaseSelected = selected && selected !== "Select Database";
+  
+  if (isDatabaseSelected) {
+    messageInput.disabled = false;
+    messageInput.placeholder = "Describe the SQL query you want...";
+    // Enable submit button only if there's also text in the input
+    if (messageInput.value.trim()) {
+      submitButton.disabled = false;
+    } else {
+      submitButton.disabled = true;
+    }
+  } else {
+    messageInput.disabled = true;
+    messageInput.placeholder = "Please select a database first...";
+    submitButton.disabled = true;
+  }
+}
+
 function initializeApp() {
   initChat();
   setupEventListeners();
@@ -71,15 +95,7 @@ function setupEventListeners() {
   });
 
   DOM.messageInput?.addEventListener("input", () => {
-    const submitButton = DOM.submitButton;
-    const messageInput = DOM.messageInput;
-    if (!submitButton || !messageInput) return;
-    const selected = getSelectedGraph();
-    if (messageInput.value && selected && selected !== "Select Database") {
-      submitButton.disabled = false;
-    } else {
-      submitButton.disabled = true;
-    }
+    updateInputState();
   });
 
   DOM.menuButton?.addEventListener("click", () =>
@@ -245,6 +261,10 @@ function setupUIComponents() {
 
 function loadInitialData() {
   loadGraphs();
+  updateInputState(); // Set initial input state based on database selection
 }
+
+// Expose updateInputState globally so other modules can use it
+(window as any).updateInputState = updateInputState;
 
 document.addEventListener("DOMContentLoaded", initializeApp);
