@@ -265,6 +265,14 @@
   display: block;
 }
 
+.user-profile-initial {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--falkor-quaternary);
+    color: var(--text-primary);
+    font-weight: bold;
+}
 .user-profile-info {
   padding: 15px;
   border-bottom: 1px solid var(--falkor-quaternary);

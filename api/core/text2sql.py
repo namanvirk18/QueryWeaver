@@ -417,14 +417,14 @@ What this will do:
                             answer_an["sql_query"],
                             db_url
                         )
-
-                        yield json.dumps(
-                            {
-                                "type": "query_result",
-                                "data": query_results,
-                                "final_response": False
-                            }
-                        ) + MESSAGE_DELIMITER
+                        if len(query_results) != 0:
+                            yield json.dumps(
+                                {
+                                    "type": "query_result",
+                                    "data": query_results,
+                                    "final_response": False
+                                }
+                            ) + MESSAGE_DELIMITER
 
                         # If schema was modified, refresh the graph using the appropriate loader
                         if is_schema_modifying:
@@ -564,7 +564,10 @@ What this will do:
             )
 
             # Save conversation with memory tool (run in background)
-            save_task = asyncio.create_task(memory_tool.add_new_memory(full_response))
+            save_task = asyncio.create_task(
+                memory_tool.add_new_memory(full_response,
+                                            [queries_history, result_history])
+            )
             # Add error handling callback to prevent silent failures
             save_task.add_done_callback(
                 lambda t: logging.error("Memory save failed: %s", t.exception())  # nosemgrep
@@ -753,6 +756,10 @@ async def refresh_database_schema(user_id: str, graph_id: str):
     if they suspect the graph is out of sync with the database.
     """
     graph_id = _graph_name(user_id, graph_id)
+
+    # Prevent refresh of demo databases
+    if GENERAL_PREFIX and graph_id.startswith(GENERAL_PREFIX):
+        raise InvalidArgumentError("Demo graphs cannot be refreshed")
 
     try:
         # Get database description and URL

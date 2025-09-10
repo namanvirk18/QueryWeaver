@@ -172,16 +172,8 @@ async function handleEmailSignup(e: Event) {
         const data = await response.json();
 
         if (data.success) {
-            alert('Account created successfully! Please sign in.');
-            // Switch to login modal
-            const signupModal = document.getElementById('signup-modal') as HTMLElement | null;
-            const loginModal = document.getElementById('login-modal') as HTMLElement | null;
-            if (signupModal && loginModal) {
-                signupModal.style.display = 'none';
-                loginModal.style.display = 'flex';
-            }
-            // Clear form
-            form.reset();
+            // Reload page to update authentication state
+            window.location.reload();
         } else {
             alert(data.error || 'Signup failed. Please try again.');
         }

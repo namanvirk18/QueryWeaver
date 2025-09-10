@@ -41,6 +41,7 @@
     {# Set authentication state for JS #}
     <script>
       window.isAuthenticated = {{ 'true' if is_authenticated else 'false' }};
+      window.generalPrefix = {{ general_prefix|tojson if general_prefix else 'null' }};
       {% if user_info %}
       window.currentUser = {
           name: "{{ user_info.name|e }}",
