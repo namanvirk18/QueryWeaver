@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "com.falkordb/queryweaver",
+  "description": "An MCP server for Text2SQL: transforms natural language into SQL using graph schema understanding.",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/FalkorDB/QueryWeaver",
+    "source": "github"
+  },
+  "version": "0.0.10",
+  "packages": [
+    {
+      "registry_type": "oci",
+      "identifier": "falkordb/queryweaver",
+      "version": "0.0.10",
+      "transport": {
+        "type": "streamable-http",
+        "url": "https://app.queryweaver.ai/mcp"
+      }
+    }
+  ]
+}

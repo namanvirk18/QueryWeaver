@@ -62,6 +62,10 @@ COPY . .
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
+
+# Add MCP label
+LABEL io.modelcontextprotocol.server.name="com.falkordb/QueryWeaver"
+
 EXPOSE 5000 6379 3000
 
 # Use start.sh as entrypoint
