@@ -237,11 +237,11 @@ class AnalysisAgent(BaseAgent):
 
             - Analyze the query's translatability into SQL according to the instructions.
             - Apply the instructions explicitly.
+            - You MUST NEVER use application-level identifiers that are email-based or encoded emails.
             - If you CANNOT apply instructions in the SQL, explain why under
               "instructions_comments", "explanation" and reduce your confidence.
             - Penalize confidence appropriately if any part of the instructions is unmet.
-            - When there several tables that can be used to answer the question,
-              you can combine them in a single SQL query.
+            - When there several tables that can be used to answer the question, you can combine them in a single SQL query.
             - Use the memory context to inform your SQL generation, considering user preferences and previous database interactions.
             - For personal queries ("I", "my", "me", "I have"), FIRST check if user identification exists in memory context (user name, previous personal queries, etc.) before determining translatability.
             - NEVER assume general/company-wide interpretations for personal pronouns when NO user context is available.
@@ -254,6 +254,12 @@ class AnalysisAgent(BaseAgent):
             - CRITICAL: If missing personalization information is a significant part of the user query (e.g., the query is primarily about "my orders", "my account", "my data", "employees I have", "how many X do I have") AND no user identification exists in memory context or schema, set "is_sql_translatable" to false.
             - DO NOT assume general/company-wide interpretations for personal pronouns when NO user context is available.
             - Mark as translatable if sufficient user context exists in memory context to identify the specific user, even for primarily personal queries.
+            - If a query depends on personal context (e.g., "my", "me", "birthday", "account", "orders") 
+                and the required information (user_id, birthday, etc.) is missing in memory context or schema:
+                    - Set "is_sql_translatable" to false
+                    - Add the required information to "missing_information"
+                    - Leave "sql_query" as an empty string ("")
+                    - Do NOT fabricate placeholders (e.g., <USER_ID>, <USER_BIRTHDAY>, <PLACEHOLDER>)
 
             Provide your output ONLY in the following JSON structure:
 
@@ -281,16 +287,17 @@ class AnalysisAgent(BaseAgent):
             2. Check if the query's intent is clear enough for SQL translation.
             3. Identify any ambiguities in the query or instructions.
             4. List missing information explicitly if applicable.
-            5. Confirm if necessary joins are possible.
-            6. Consider if complex calculations are feasible in SQL.
-            7. Identify multiple interpretations if they exist.
-            8. Strictly apply instructions; explain and penalize if not possible.
-            9. If the question is a follow-up, resolve references using the
+            5. When critical information is missing make the is_sql_translatable false and add it to missing_information.
+            6. Confirm if necessary joins are possible.
+            7. If similar query have been failed before, learn the error and try to avoid it.
+            8. Consider if complex calculations are feasible in SQL.
+            9. Identify multiple interpretations if they exist.
+            10. If the question is a follow-up, resolve references using the
                conversation history and previous answers.
-            10. Use memory context to provide more personalized and informed SQL generation.
-            11. Learn from successful query patterns in memory context and avoid failed approaches.
-            12. For personal queries, FIRST check memory context for user identification. If user identity is found in memory context (user name, previous personal queries, etc.), the query IS translatable.
-            13. CRITICAL PERSONALIZATION CHECK: If missing user identification/personalization is a significant or primary component of the query (e.g., "show my orders", "my account balance", "my recent purchases", "how many employees I have", "products I own") AND no user identification is available in memory context or schema, set "is_sql_translatable" to false. However, if memory context contains user identification (like user name or previous successful personal queries), then personal queries ARE translatable even if they are the primary component of the query.
+            11. Use memory context to provide more personalized and informed SQL generation.
+            12. Learn from successful query patterns in memory context and avoid failed approaches.
+            13. For personal queries, FIRST check memory context for user identification. If user identity is found in memory context (user name, previous personal queries, etc.), the query IS translatable.
+            14. CRITICAL PERSONALIZATION CHECK: If missing user identification/personalization is a significant or primary component of the query (e.g., "show my orders", "my account balance", "my recent purchases", "how many employees I have", "products I own") AND no user identification is available in memory context or schema, set "is_sql_translatable" to false. However, if memory context contains user identification (like user name or previous successful personal queries), then personal queries ARE translatable even if they are the primary component of the query.
 
             Again: OUTPUT ONLY VALID JSON. No explanations outside the JSON block. """  # pylint: disable=line-too-long
         return prompt

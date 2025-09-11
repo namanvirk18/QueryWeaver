@@ -4,10 +4,23 @@ This module contains the configuration for the text2sql module.
 """
 
 import os
+import logging
 import dataclasses
 from typing import Union
-
 from litellm import embedding
+
+# Configure litellm logging to prevent sensitive data leakage
+def configure_litellm_logging():
+    """Configure litellm to suppress completion logs."""
+
+    # Disable LiteLLM logger that outputs
+    litellm_logger = logging.getLogger("LiteLLM")
+    litellm_logger.setLevel(logging.ERROR)
+    litellm_logger.disabled = True
+
+
+# Initialize litellm configuration
+configure_litellm_logging()
 
 
 class EmbeddingsModel:
