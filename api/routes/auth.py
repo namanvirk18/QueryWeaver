@@ -23,6 +23,8 @@ from pydantic import BaseModel
 from api.auth.user_management import delete_user_token, ensure_user_in_organizations, validate_user
 from api.extensions import db
 
+# Import GENERAL_PREFIX from graphs route
+GENERAL_PREFIX = os.getenv("GENERAL_PREFIX")
 
 # Router
 auth_router = APIRouter(tags=["Authentication"])
@@ -404,6 +406,7 @@ async def home(request: Request) -> HTMLResponse:
             "request": request,
             "is_authenticated": is_authenticated_flag,
             "user_info": user_info,
+            "general_prefix": GENERAL_PREFIX,
             **auth_config,
         }
     )
