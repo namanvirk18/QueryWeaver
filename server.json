@@ -11,11 +11,12 @@
   "packages": [
     {
       "registry_type": "oci",
+      "registry_base_url": "https://docker.io",
       "identifier": "falkordb/queryweaver",
       "version": "0.0.10",
       "transport": {
         "type": "streamable-http",
-        "url": "https://app.queryweaver.ai/mcp"
+        "url": "https://localhost:5000/mcp"
       }
     }
   ]
