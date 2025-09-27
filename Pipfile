@@ -4,9 +4,9 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-fastapi = "~=0.116.1"
-uvicorn = "~=0.35.0"
-litellm = "~=1.77.1"
+fastapi = "~=0.117.1"
+uvicorn = "~=0.36.0"
+litellm = "~=1.77.3"
 falkordb = "~=1.2.0"
 psycopg2-binary = "~=2.9.9"
 pymysql = "~=1.1.0"
