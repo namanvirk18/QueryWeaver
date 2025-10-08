@@ -71,6 +71,39 @@ def create_app():
         ],
     )
 
+    # Include routers
+    app.include_router(auth_router)
+    app.include_router(graphs_router, prefix="/graphs")
+    app.include_router(database_router)
+    app.include_router(tokens_router, prefix="/tokens")
+
+    # Control MCP endpoints via environment variable DISABLE_MCP
+    # Default: MCP is enabled unless DISABLE_MCP is set to true
+    disable_mcp = os.getenv("DISABLE_MCP", "false").lower() in ("1", "true", "yes")
+    if disable_mcp:
+        logging.info("MCP endpoints disabled via DISABLE_MCP environment variable")
+    else:
+        # FastMCP.from_fastapi(app)  # pylint: disable=unused-variable
+        mcp = FastMCP.from_fastapi(
+            app=app,
+            name="queryweaver",
+            route_maps=[
+                RouteMap(methods=["GET"], tags={"resource"}, mcp_type=MCPType.RESOURCE),
+                RouteMap(methods=["POST"], tags={"tool"}, mcp_type=MCPType.TOOL),
+                RouteMap(mcp_type=MCPType.EXCLUDE),
+            ]
+        )
+        mcp_app = mcp.http_app(path="/mcp")
+        # Combine the MCP app and original app
+        app = FastAPI(
+            title="QueryWeaver",
+            routes=[
+                *mcp_app.routes,  # MCP routes
+                *app.routes,  # Original API routes
+            ],
+            lifespan=mcp_app.lifespan,
+        )
+
     # Add security schemes to OpenAPI after app creation
     def custom_openapi():
         if app.openapi_schema:
@@ -143,39 +176,7 @@ def create_app():
     # Initialize authentication (OAuth and sessions)
     init_auth(app)
 
-    # Include routers
-    app.include_router(auth_router)
-    app.include_router(graphs_router, prefix="/graphs")
-    app.include_router(database_router)
-    app.include_router(tokens_router, prefix="/tokens")
-
     setup_oauth_handlers(app, app.state.oauth)
-
-    # Control MCP endpoints via environment variable DISABLE_MCP
-    # Default: MCP is enabled unless DISABLE_MCP is set to true
-    disable_mcp = os.getenv("DISABLE_MCP", "false").lower() in ("1", "true", "yes")
-    if disable_mcp:
-        logging.info("MCP endpoints disabled via DISABLE_MCP environment variable")
-    else:
-        # FastMCP.from_fastapi(app)  # pylint: disable=unused-variable
-        mcp = FastMCP.from_fastapi(
-            app=app,
-            name="queryweaver",
-            route_maps=[
-                RouteMap(methods=["GET"], tags={"resource"}, mcp_type=MCPType.RESOURCE),
-                RouteMap(methods=["POST"], tags={"tool"}, mcp_type=MCPType.TOOL),
-                RouteMap(mcp_type=MCPType.EXCLUDE),
-            ]
-        )
-        mcp_app = mcp.http_app(path="/mcp")
-        app = FastAPI(
-            title="QueryWeaver",
-            routes=[
-                *mcp_app.routes,  # MCP routes
-                *app.routes,  # Original API routes
-            ],
-            lifespan=mcp_app.lifespan,
-        )
 
     @app.exception_handler(Exception)
     async def handle_oauth_error(
