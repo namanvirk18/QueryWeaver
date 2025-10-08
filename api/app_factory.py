@@ -88,10 +88,23 @@ def create_app():
             app=app,
             name="queryweaver",
             route_maps=[
-                RouteMap(methods=["GET"], tags={"resource"}, mcp_type=MCPType.RESOURCE),
-                RouteMap(methods=["POST"], tags={"tool"}, mcp_type=MCPType.TOOL),
+                RouteMap(
+                    methods=["GET"],
+                    tags={"mcp_resource"},
+                    mcp_type=MCPType.RESOURCE
+                ),
+                RouteMap(
+                    methods=["GET"],
+                    tags={"mcp_resource_template"},
+                    mcp_type=MCPType.RESOURCE_TEMPLATE,
+                ),
+                RouteMap(
+                    methods=["POST"],
+                    tags={"mcp_tool"},
+                    mcp_type=MCPType.TOOL
+                ),
                 RouteMap(mcp_type=MCPType.EXCLUDE),
-            ]
+            ],
         )
         mcp_app = mcp.http_app(path="/mcp")
         # Combine the MCP app and original app
