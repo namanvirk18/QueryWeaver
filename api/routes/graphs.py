@@ -37,7 +37,7 @@ class GraphData(BaseModel):
 @graphs_router.get(
     "",
     operation_id="list_databases",
-    tags=["mcp_resource"],
+    tags=["mcp_tool"],
     responses={401: UNAUTHORIZED_RESPONSE},
 )
 @token_required
@@ -52,7 +52,7 @@ async def list_graphs(request: Request):
 @graphs_router.get(
     "/{graph_id}/data",
     operation_id="database_schema",
-    tags=["mcp_resource_template"],
+    tags=["mcp_tool"],
     responses={401: UNAUTHORIZED_RESPONSE},
 )
 @token_required
