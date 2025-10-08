@@ -29,7 +29,7 @@ class GraphData(BaseModel):
     """
     database: str
 
-@graphs_router.get("", operation_id="list_databases", responses={
+@graphs_router.get("", operation_id="list_databases", tags=["resource"], responses={
     401: UNAUTHORIZED_RESPONSE
 })
 @token_required
@@ -40,7 +40,7 @@ async def list_graphs(request: Request):
     graphs = await list_databases(request.state.user_id, GENERAL_PREFIX)
     return JSONResponse(content=graphs)
 
-@graphs_router.get("/{graph_id}/data", operation_id="database_schema", responses={
+@graphs_router.get("/{graph_id}/data", operation_id="database_schema", tags=["resource"], responses={
     401: UNAUTHORIZED_RESPONSE
 })
 @token_required
@@ -99,7 +99,7 @@ async def load_graph(request: Request, data: GraphData = None, file: UploadFile 
     else:
         raise HTTPException(status_code=415, detail="Unsupported Content-Type")
 
-@graphs_router.post("/{graph_id}", operation_id="query_database", responses={
+@graphs_router.post("/{graph_id}", operation_id="query_database", tags=["tool"], responses={
     401: UNAUTHORIZED_RESPONSE
 })
 @token_required
