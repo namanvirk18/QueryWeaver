@@ -84,3 +84,8 @@ labelColor
 logoColor
 svg
 yml
+
+socio
+sexualized
+www
+faq

@@ -13,10 +13,12 @@ USER root
 # Copy Python 3.12 from the python base image
 COPY --from=python-base /usr/local /usr/local
 
-# Install netcat for wait loop in start.sh
-RUN apt-get update && apt-get install -y \
+# Install netcat for wait loop in start.sh and system build tools needed for
+# compiling Python wheels (g++, make, libc-dev)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     netcat-openbsd \
     git \
+    build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/local/bin/python3.12 /usr/bin/python3 \
     && ln -sf /usr/local/bin/python3.12 /usr/bin/python
