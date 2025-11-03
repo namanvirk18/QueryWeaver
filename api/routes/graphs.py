@@ -38,12 +38,13 @@ class GraphData(BaseModel):
     "",
     operation_id="list_databases",
     tags=["mcp_tool"],
-    responses={401: UNAUTHORIZED_RESPONSE},
+    responses={401: UNAUTHORIZED_RESPONSE}
 )
 @token_required
 async def list_graphs(request: Request):
     """
-    This route is used to list all the graphs (databases names) that are available in the database.
+    List all available graphs/databases for the authenticated user.
+    Requires authentication.
     """
     graphs = await list_databases(request.state.user_id, GENERAL_PREFIX)
     return JSONResponse(content=graphs)
@@ -53,17 +54,14 @@ async def list_graphs(request: Request):
     "/{graph_id}/data",
     operation_id="database_schema",
     tags=["mcp_tool"],
-    responses={401: UNAUTHORIZED_RESPONSE},
+    responses={401: UNAUTHORIZED_RESPONSE}
 )
 @token_required
 async def get_graph_data(
     request: Request, graph_id: str
 ):  # pylint: disable=too-many-locals,too-many-branches
-    """Return all nodes and edges for the specified database schema (namespaced to the user).
-
-    This endpoint returns a JSON object with two keys: `nodes` and `edges`.
-    Nodes contain a minimal set of properties (id, name, labels, props).
-    Edges contain source and target node names (or internal ids), type and props.
+    """Return all nodes and edges for the specified database schema.
+    Requires authentication.
 
         args:
             graph_id (str): The ID of the graph to query (the database name).
@@ -125,7 +123,7 @@ async def load_graph(
     "/{graph_id}",
     operation_id="query_database",
     tags=["mcp_tool"],
-    responses={401: UNAUTHORIZED_RESPONSE},
+    responses={401: UNAUTHORIZED_RESPONSE}
 )
 @token_required
 async def query_graph(
@@ -133,6 +131,7 @@ async def query_graph(
 ):  # pylint: disable=too-many-statements
     """
     Query the Database with the given graph_id and chat_data.
+    Requires authentication.
 
         Args:
             graph_id (str): The ID of the graph to query.
@@ -153,7 +152,8 @@ async def confirm_destructive_operation(
     confirm_data: ConfirmRequest,
 ):
     """
-    Handle user confirmation for destructive SQL operations
+    Handle user confirmation for destructive SQL operations.
+    Requires authentication.
     """
 
     try:
@@ -172,11 +172,13 @@ async def refresh_graph_schema(request: Request, graph_id: str):
     Manually refresh the graph schema from the database.
     This endpoint allows users to manually trigger a schema refresh
     if they suspect the graph is out of sync with the database.
+    Streams progress steps as a sequence of JSON messages.
     """
     try:
-        return await refresh_database_schema(request.state.user_id, graph_id)
-    except InternalError as ie:
-        return JSONResponse(content={"error": str(ie)}, status_code=500)
+        generator = await refresh_database_schema(request.state.user_id, graph_id)
+        return StreamingResponse(generator, media_type="application/json")
+    except (InternalError, InvalidArgumentError) as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500 if isinstance(e, InternalError) else 400)
 
 
 @graphs_router.delete("/{graph_id}", responses={401: UNAUTHORIZED_RESPONSE})
