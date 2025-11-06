@@ -190,14 +190,26 @@ def create_app():
     if os.path.exists(dist_path):
         # Mount the built React app's static assets
         # Vite bundles JS/CSS into assets/, and copies public/ files to dist root
-        app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
-        
+        app.mount(
+            "/assets",
+            StaticFiles(directory=os.path.join(dist_path, "assets")),
+            name="assets"
+        )
+
         # Mount public folders if they exist
         if os.path.exists(os.path.join(dist_path, "icons")):
-            app.mount("/icons", StaticFiles(directory=os.path.join(dist_path, "icons")), name="icons")
+            app.mount(
+                "/icons",
+                StaticFiles(directory=os.path.join(dist_path, "icons")),
+                name="icons"
+            )
         if os.path.exists(os.path.join(dist_path, "img")):
-            app.mount("/img", StaticFiles(directory=os.path.join(dist_path, "img")), name="img")
-        
+            app.mount(
+                "/img",
+                StaticFiles(directory=os.path.join(dist_path, "img")),
+                name="img"
+            )
+
         # Serve favicon and other root files
         app.mount("/static", StaticFiles(directory=dist_path), name="static")
     else:

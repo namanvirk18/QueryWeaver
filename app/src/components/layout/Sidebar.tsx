@@ -22,6 +22,8 @@ interface SidebarProps {
   className?: string;
   onSchemaClick?: () => void;
   isSchemaOpen?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const SidebarIcon = ({ icon: Icon, label, active, onClick, href }: { 
@@ -79,17 +81,24 @@ const SidebarIcon = ({ icon: Icon, label, active, onClick, href }: {
   </TooltipProvider>
 );
 
-const Sidebar = ({ className, onSchemaClick, isSchemaOpen }: SidebarProps) => {
+const Sidebar = ({ className, onSchemaClick, isSchemaOpen, isCollapsed = false, onToggleCollapse }: SidebarProps) => {
   return (
-    <aside className={cn("fixed inset-y-0 left-0 z-50 flex w-16 flex-col border-r border-gray-700 bg-gray-900", className)}>
-      <nav className="flex flex-col items-center gap-4 px-2 py-4">
-        <Link
-          to="#"
-          className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-gray-800 text-lg font-semibold text-white"
-        >
-          <PanelLeft className="h-5 w-5 transition-all group-hover:scale-110" />
-          <span className="sr-only">QueryWeaver</span>
-        </Link>
+    <>
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-gray-700 bg-gray-900 transition-all duration-300",
+        // Only collapse on mobile (md:w-16 keeps it visible on desktop)
+        isCollapsed ? "w-0 -translate-x-full overflow-hidden md:w-16 md:translate-x-0" : "w-16",
+        className
+      )}>
+        <nav className="flex flex-col items-center gap-4 px-2 py-4">
+          <button
+            onClick={onToggleCollapse}
+            className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-gray-800 text-lg font-semibold text-white hover:bg-gray-700 md:cursor-default md:pointer-events-none md:opacity-100"
+            title="Toggle Sidebar (Mobile)"
+          >
+            <PanelLeft className="h-5 w-5 transition-all group-hover:scale-110" />
+            <span className="sr-only">Toggle Sidebar</span>
+          </button>
         <ThemeToggle />
         {/* <SidebarIcon icon={BrainCircuit} label="Query" active /> */}
         <SidebarIcon 
@@ -110,6 +119,7 @@ const Sidebar = ({ className, onSchemaClick, isSchemaOpen }: SidebarProps) => {
         <SidebarIcon icon={Settings} label="Settings" />
       </nav>
     </aside>
+    </>
   );
 };
 

@@ -144,7 +144,7 @@ const TokensModal: React.FC<TokensModalProps> = ({ open, onOpenChange }) => {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-gray-800 border-gray-600">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-gray-800 border-gray-600">
           <DialogHeader>
             <DialogTitle className="text-gray-100">API Tokens</DialogTitle>
             <DialogDescription className="text-gray-400">
@@ -174,19 +174,19 @@ const TokensModal: React.FC<TokensModalProps> = ({ open, onOpenChange }) => {
                   <p className="text-sm text-gray-300 mb-3">
                     <strong>Important:</strong> This is the only time you'll see this token. Copy it now and store it securely.
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex-1 flex gap-2">
                       <Input
                         type={showToken ? 'text' : 'password'}
                         value={newToken}
                         readOnly
-                        className="bg-gray-900 border-gray-600 text-gray-100 font-mono text-sm"
+                        className="bg-gray-900 border-gray-600 text-gray-100 font-mono text-xs sm:text-sm"
                       />
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setShowToken(!showToken)}
-                        className="bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600"
+                        className="bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 flex-shrink-0"
                       >
                         {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
@@ -213,38 +213,40 @@ const TokensModal: React.FC<TokensModalProps> = ({ open, onOpenChange }) => {
               ) : tokens.length === 0 ? (
                 <p className="text-gray-400">You don't have any API tokens yet.</p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-gray-600">
-                      <TableHead className="text-gray-300">Token</TableHead>
-                      <TableHead className="text-gray-300">Created</TableHead>
-                      <TableHead className="text-gray-300">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tokens.map((token) => (
-                      <TableRow key={token.token_id} className="border-gray-600">
-                        <TableCell className="text-gray-200 font-mono">
-                          ****{token.token_id}
-                        </TableCell>
-                        <TableCell className="text-gray-300">
-                          {formatDate(token.created_at)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => setDeleteTokenId(token.token_id)}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Delete
-                          </Button>
-                        </TableCell>
+                <div className="overflow-x-auto -mx-2 sm:mx-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-gray-600">
+                        <TableHead className="text-gray-300">Token</TableHead>
+                        <TableHead className="text-gray-300 hidden sm:table-cell">Created</TableHead>
+                        <TableHead className="text-gray-300">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {tokens.map((token) => (
+                        <TableRow key={token.token_id} className="border-gray-600">
+                          <TableCell className="text-gray-200 font-mono text-xs sm:text-sm">
+                            ****{token.token_id}
+                          </TableCell>
+                          <TableCell className="text-gray-300 text-xs sm:text-sm hidden sm:table-cell">
+                            {formatDate(token.created_at)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => setDeleteTokenId(token.token_id)}
+                              className="bg-red-600 hover:bg-red-700 h-8 px-2 sm:px-3"
+                            >
+                              <Trash2 className="h-4 w-4 sm:mr-1" />
+                              <span className="hidden sm:inline">Delete</span>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </div>
           </div>

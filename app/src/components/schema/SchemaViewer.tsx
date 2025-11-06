@@ -30,9 +30,10 @@ interface SchemaViewerProps {
   isOpen: boolean;
   onClose: () => void;
   onWidthChange?: (width: number) => void;
+  sidebarWidth?: number;
 }
 
-const SchemaViewer = ({ isOpen, onClose, onWidthChange }: SchemaViewerProps) => {
+const SchemaViewer = ({ isOpen, onClose, onWidthChange, sidebarWidth = 64 }: SchemaViewerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<any>(null);
   const resizeRef = useRef<HTMLDivElement>(null);
@@ -393,10 +394,29 @@ const SchemaViewer = ({ isOpen, onClose, onWidthChange }: SchemaViewerProps) => 
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed left-16 top-0 h-full bg-gray-900 border-r border-gray-700 z-30 flex flex-col"
-      style={{ width: `${width}px` }}
-    >
+    <>
+      {/* Mobile overlay backdrop */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={onClose}
+        />
+      )}
+      
+      {/* Schema Viewer */}
+      <div
+        className={`fixed top-0 left-0 md:left-[${sidebarWidth}px] h-full bg-gray-900 border-r border-gray-700 flex flex-col transition-all duration-300
+          ${isOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'}
+          md:z-30 z-50
+          w-[80vw] max-w-[400px] md:max-w-none
+        `}
+        style={{ 
+          ...(isOpen && window.innerWidth >= 768 ? {
+            left: `${sidebarWidth}px`,
+            width: `${width}px`
+          } : {})
+        }}
+      >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
         <h2 className="text-lg font-semibold text-gray-100">Database Schema</h2>
@@ -507,6 +527,7 @@ const SchemaViewer = ({ isOpen, onClose, onWidthChange }: SchemaViewerProps) => 
         </div>
       </div>
     </div>
+    </>
   );
 };
 

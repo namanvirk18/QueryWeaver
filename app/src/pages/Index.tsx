@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Trash2, Star, RefreshCw } from "lucide-react";
+import { Trash2, Star, RefreshCw, PanelLeft } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import ChatInterface from "@/components/chat/ChatInterface";
@@ -32,18 +32,55 @@ const Index = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSchemaViewer, setShowSchemaViewer] = useState(false);
   const [showTokensModal, setShowTokensModal] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [schemaViewerWidth, setSchemaViewerWidth] = useState(Math.floor(window.innerWidth * 0.4));
   const [githubStars, setGithubStars] = useState<string>('-');
   const [databaseToDelete, setDatabaseToDelete] = useState<{ id: string; name: string; isDemo: boolean } | null>(null);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Calculate main content margin based on schema viewer state
-  const mainContentMargin = showSchemaViewer ? `${schemaViewerWidth + 64}px` : '64px';
+  // Handle window resize to update layout
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Calculate sidebar width based on collapsed state
+  // On desktop: sidebar is always visible (64px), on mobile: can be collapsed (0px)
+  const getSidebarWidth = () => {
+    const isMobile = windowWidth < 768;
+    if (isMobile) {
+      return sidebarCollapsed ? 0 : 64;
+    }
+    return 64; // Always visible on desktop
+  };
   
-  // Calculate main content width based on schema viewer state
-  const mainContentWidth = showSchemaViewer 
-    ? `calc(100% - ${schemaViewerWidth + 64}px)` 
-    : 'calc(100% - 64px)';
+  const sidebarWidth = getSidebarWidth();
+  
+  // Calculate main content margin and width
+  // On mobile: ignore schema viewer (it's an overlay), only account for sidebar
+  // On desktop: account for both sidebar and schema viewer
+  const getMainContentStyles = () => {
+    const isMobile = windowWidth < 768;
+    
+    if (isMobile) {
+      return {
+        marginLeft: `${sidebarWidth}px`,
+        width: `calc(100% - ${sidebarWidth}px)`
+      };
+    }
+    
+    // Desktop
+    const totalOffset = showSchemaViewer ? schemaViewerWidth + sidebarWidth : sidebarWidth;
+    return {
+      marginLeft: `${totalOffset}px`,
+      width: `calc(100% - ${totalOffset}px)`
+    };
+  };
 
   // Fetch GitHub stars
   useEffect(() => {
@@ -251,6 +288,8 @@ const Index = () => {
       <Sidebar 
         onSchemaClick={() => setShowSchemaViewer(!showSchemaViewer)}
         isSchemaOpen={showSchemaViewer}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
       
       {/* Schema Viewer */}
@@ -258,94 +297,189 @@ const Index = () => {
         isOpen={showSchemaViewer}
         onClose={() => setShowSchemaViewer(false)}
         onWidthChange={setSchemaViewerWidth}
+        sidebarWidth={sidebarWidth}
       />
       
       {/* Main Content */}
-      <div className="flex flex-1 flex-col transition-all duration-300" style={{ marginLeft: mainContentMargin, width: mainContentWidth }}>
+      <div className="flex flex-1 flex-col transition-all duration-300" style={getMainContentStyles()}>
         {/* Header */}
-        <header className="flex items-center justify-between p-6 border-b border-gray-700">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-               <img src="/icons/queryweaver.svg" alt="QueryWeaver" style={{ height: '3rem', width: 'auto' }} />
-               <span className="text-gray-400">|</span>
-               <p className="text-sm text-gray-400">Graph-Powered Text-to-SQL</p>
+        <header className="border-b border-gray-700">
+          {/* Desktop Header */}
+          <div className="hidden md:flex items-center justify-between p-6">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <img src="/icons/queryweaver.svg" alt="QueryWeaver" style={{ height: '3rem', width: 'auto' }} />
+                <span className="text-gray-400">|</span>
+                <p className="text-sm text-gray-400">Graph-Powered Text-to-SQL</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {selectedGraph ? (
+                <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+                  Connected: {selectedGraph.name}
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="bg-yellow-600 hover:bg-yellow-700">
+                  No Database Selected
+                </Badge>
+              )}
+              {/* GitHub Stars Link */}
+              <a 
+                href="https://github.com/FalkorDB/QueryWeaver" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors text-gray-300 hover:text-white"
+                title="View QueryWeaver on GitHub"
+              >
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="currentColor" 
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M12 0C5.374 0 0 5.373 0 12 0 17.302 3.438 21.8 8.207 23.387c.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
+                </svg>
+                <Star className="w-3 h-3" fill="currentColor" />
+                <span className="text-sm font-medium">{githubStars}</span>
+              </a>
+              {isAuthenticated ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="p-0 h-auto rounded-full hover:opacity-80 transition-opacity"
+                      title={user?.name || user?.email}
+                    >
+                      <Avatar className="h-10 w-10 border-2 border-purple-500">
+                        <AvatarImage src={user?.picture} alt={user?.name || user?.email} />
+                        <AvatarFallback className="bg-purple-600 text-white font-medium">
+                          {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="bg-gray-800 border-gray-600 text-gray-200" align="end">
+                    <div className="px-3 py-2 border-b border-gray-600">
+                      <p className="text-sm font-medium text-gray-100">{user?.name}</p>
+                      <p className="text-xs text-gray-400">{user?.email}</p>
+                    </div>
+                    <DropdownMenuItem className="hover:!bg-gray-700 cursor-pointer" onClick={() => setShowTokensModal(true)}>
+                      API Tokens
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-gray-600" />
+                    <DropdownMenuItem className="hover:!bg-gray-700 cursor-pointer" onClick={handleLogout}>
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  className="bg-purple-600 border-purple-500 text-white hover:bg-purple-700"
+                  onClick={() => setShowLoginModal(true)}
+                >
+                  Sign In
+                </Button>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {selectedGraph ? (
-              <Badge variant="default" className="bg-green-600 hover:bg-green-700">
-                Connected: {selectedGraph.name}
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="bg-yellow-600 hover:bg-yellow-700">
-                No Database Selected
-              </Badge>
-            )}
-            {/* GitHub Stars Link */}
-            <a 
-              href="https://github.com/FalkorDB/QueryWeaver" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors text-gray-300 hover:text-white"
-              title="View QueryWeaver on GitHub"
-            >
-              <svg 
-                width="16" 
-                height="16" 
-                viewBox="0 0 24 24" 
-                fill="currentColor" 
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M12 0C5.374 0 0 5.373 0 12 0 17.302 3.438 21.8 8.207 23.387c.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
-              </svg>
-              <Star className="w-3 h-3" fill="currentColor" />
-              <span className="text-sm font-medium">{githubStars}</span>
-            </a>
-            {isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    className="p-0 h-auto rounded-full hover:opacity-80 transition-opacity"
-                    title={user?.name || user?.email}
+
+          {/* Mobile Header */}
+          <div className="md:hidden p-4 space-y-3">
+            {/* Row 1: Hamburger (if collapsed) + Logo + User */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {sidebarCollapsed && (
+                  <button
+                    onClick={() => setSidebarCollapsed(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-all"
                   >
-                    <Avatar className="h-10 w-10 border-2 border-purple-500">
-                      <AvatarImage src={user?.picture} alt={user?.name || user?.email} />
-                      <AvatarFallback className="bg-purple-600 text-white font-medium">
-                        {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-gray-800 border-gray-600 text-gray-200" align="end">
-                  <div className="px-3 py-2 border-b border-gray-600">
-                    <p className="text-sm font-medium text-gray-100">{user?.name}</p>
-                    <p className="text-xs text-gray-400">{user?.email}</p>
-                  </div>
-                  <DropdownMenuItem className="hover:!bg-gray-700 cursor-pointer" onClick={() => setShowTokensModal(true)}>
-                    API Tokens
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-gray-600" />
-                  <DropdownMenuItem className="hover:!bg-gray-700 cursor-pointer" onClick={handleLogout}>
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button 
-                variant="outline" 
-                className="bg-purple-600 border-purple-500 text-white hover:bg-purple-700"
-                onClick={() => setShowLoginModal(true)}
+                    <PanelLeft className="h-5 w-5" />
+                  </button>
+                )}
+                <img src="/icons/queryweaver.svg" alt="QueryWeaver" className="h-8" />
+              </div>
+              {isAuthenticated ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="p-0 h-auto rounded-full hover:opacity-80 transition-opacity"
+                    >
+                      <Avatar className="h-8 w-8 border-2 border-purple-500">
+                        <AvatarImage src={user?.picture} alt={user?.name || user?.email} />
+                        <AvatarFallback className="bg-purple-600 text-white font-medium text-xs">
+                          {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="bg-gray-800 border-gray-600 text-gray-200" align="end">
+                    <div className="px-3 py-2 border-b border-gray-600">
+                      <p className="text-sm font-medium text-gray-100">{user?.name}</p>
+                      <p className="text-xs text-gray-400">{user?.email}</p>
+                    </div>
+                    <DropdownMenuItem className="hover:!bg-gray-700 cursor-pointer" onClick={() => setShowTokensModal(true)}>
+                      API Tokens
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-gray-600" />
+                    <DropdownMenuItem className="hover:!bg-gray-700 cursor-pointer" onClick={handleLogout}>
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="bg-purple-600 border-purple-500 text-white hover:bg-purple-700"
+                  onClick={() => setShowLoginModal(true)}
+                >
+                  Sign In
+                </Button>
+              )}
+            </div>
+            
+            {/* Row 2: Tagline */}
+            <p className="text-xs text-gray-400">Graph-Powered Text-to-SQL</p>
+            
+            {/* Row 3: Status and GitHub */}
+            <div className="flex items-center justify-between gap-2">
+              {selectedGraph ? (
+                <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-xs px-2 py-0.5">
+                  {selectedGraph.name}
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="bg-yellow-600 hover:bg-yellow-700 text-xs px-2 py-0.5">
+                  No DB
+                </Badge>
+              )}
+              <a 
+                href="https://github.com/FalkorDB/QueryWeaver" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 transition-colors text-gray-300"
               >
-                Sign In
-              </Button>
-            )}
+                <svg 
+                  width="14" 
+                  height="14" 
+                  viewBox="0 0 24 24" 
+                  fill="currentColor" 
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M12 0C5.374 0 0 5.373 0 12 0 17.302 3.438 21.8 8.207 23.387c.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
+                </svg>
+                <Star className="w-3 h-3" fill="currentColor" />
+                <span className="text-xs font-medium">{githubStars}</span>
+              </a>
+            </div>
           </div>
         </header>
 
         {/* Sub-header for controls */}
         <div className="px-6 py-4 border-b border-gray-700">
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap md:flex-nowrap">
               <Button 
                 variant="outline" 
                 className="bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed p-2"
@@ -357,8 +491,8 @@ const Index = () => {
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700">
-                    {selectedGraph?.name || 'Select Database'}
+                  <Button variant="outline" className="bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700 flex-1 md:flex-initial">
+                    <span className="truncate">{selectedGraph?.name || 'Select Database'}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-gray-800 border-gray-600 text-gray-200">
@@ -395,14 +529,15 @@ const Index = () => {
               </DropdownMenu>
               <Button 
                 variant="outline" 
-                className="bg-blue-600 border-blue-500 text-white hover:bg-blue-700"
+                className="bg-blue-600 border-blue-500 text-white hover:bg-blue-700 flex-1 md:flex-initial"
                 onClick={handleConnectDatabase}
               >
-                  Connect to Database
+                  <span className="hidden sm:inline">Connect to Database</span>
+                  <span className="sm:hidden">Connect DB</span>
               </Button>
               <Button 
                 variant="outline" 
-                className="bg-gray-800 border-gray-600 text-gray-300 opacity-60 cursor-not-allowed"
+                className="bg-gray-800 border-gray-600 text-gray-300 opacity-60 cursor-not-allowed hidden md:flex"
                 disabled
                 title="Upload schema feature coming soon"
                 onClick={(e) => e.preventDefault()}

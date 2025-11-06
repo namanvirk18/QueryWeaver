@@ -178,7 +178,8 @@ async def refresh_graph_schema(request: Request, graph_id: str):
         generator = await refresh_database_schema(request.state.user_id, graph_id)
         return StreamingResponse(generator, media_type="application/json")
     except (InternalError, InvalidArgumentError) as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500 if isinstance(e, InternalError) else 400)
+        status_code = 500 if isinstance(e, InternalError) else 400
+        return JSONResponse(content={"error": str(e)}, status_code=status_code)
 
 
 @graphs_router.delete("/{graph_id}", responses={401: UNAUTHORIZED_RESPONSE})

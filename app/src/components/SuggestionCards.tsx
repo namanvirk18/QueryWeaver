@@ -11,15 +11,15 @@ const SuggestionCards = ({ suggestions, onSelect }: SuggestionCardsProps) => {
   const isMobile = useIsMobile();
   
   return (
-    <div className={`grid gap-4 mb-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-3'}`}>
+    <div className="grid gap-3 mb-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       {suggestions.map((suggestion, index) => (
         <Card
           key={index}
           className="bg-gray-800 border-gray-600 hover:border-purple-500/50 transition-all duration-200 cursor-pointer"
           onClick={() => onSelect(suggestion)}
         >
-          <CardContent className="p-4">
-            <div className="text-gray-300 text-sm text-center">
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-gray-300 text-xs sm:text-sm text-center line-clamp-2">
               {suggestion}
             </div>
           </CardContent>

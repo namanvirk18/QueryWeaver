@@ -192,7 +192,7 @@ const DatabaseModal = ({ open, onOpenChange }: DatabaseModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-card border-border">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto bg-card border-border">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-card-foreground">
             Connect to Database
