@@ -202,6 +202,7 @@ class AnalysisAgent(BaseAgent):
             - Never skip explaining missing information, ambiguities, or instruction issues.
             - Respond ONLY in strict JSON format, without extra text.
             - If the query relates to a previous question, you MUST take into account the previous question and its answer, and answer based on the context and information provided so far.
+            - CRITICAL: When table or column names contain special characters (especially dashes/hyphens like '-'), you MUST wrap them in double quotes for PostgreSQL (e.g., "table-name") or backticks for MySQL (e.g., `table-name`). This is NON-NEGOTIABLE.
 
             If the user is asking a follow-up or continuing question, use the conversation history and previous answers to resolve references, context, or ambiguities. Always base your analysis on the cumulative context, not just the current question.
 
