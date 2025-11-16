@@ -1,5 +1,6 @@
 """Graph-related routes for the text2sql API."""
 
+import logging
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -73,7 +74,11 @@ async def get_graph_data(
     except GraphNotFoundError as gnfe:
         return JSONResponse(content={"error": str(gnfe)}, status_code=404)
     except InternalError as ie:
-        return JSONResponse(content={"error": str(ie)}, status_code=500)
+        logging.error("Internal error getting schema: %s", str(ie))
+        return JSONResponse(
+            content={"error": "Failed to retrieve database schema"},
+            status_code=500
+        )
 
 
 @graphs_router.post("", responses={401: UNAUTHORIZED_RESPONSE})
@@ -178,8 +183,16 @@ async def refresh_graph_schema(request: Request, graph_id: str):
         generator = await refresh_database_schema(request.state.user_id, graph_id)
         return StreamingResponse(generator, media_type="application/json")
     except (InternalError, InvalidArgumentError) as e:
-        status_code = 500 if isinstance(e, InternalError) else 400
-        return JSONResponse(content={"error": str(e)}, status_code=status_code)
+        # Log detailed error internally, send generic message to user
+        if isinstance(e, InternalError):
+            logging.error("Internal error refreshing schema: %s", str(e))
+            error_message = "Failed to refresh database schema"
+            status_code = 500
+        else:
+            logging.warning("Invalid argument refreshing schema: %s", str(e))
+            error_message = "Invalid request to refresh schema"
+            status_code = 400
+        return JSONResponse(content={"error": error_message}, status_code=status_code)
 
 
 @graphs_router.delete("/{graph_id}", responses={401: UNAUTHORIZED_RESPONSE})
@@ -202,4 +215,8 @@ async def delete_graph(request: Request, graph_id: str):
     except GraphNotFoundError as gnfe:
         return JSONResponse(content={"error": str(gnfe)}, status_code=404)
     except InternalError as ie:
-        return JSONResponse(content={"error": str(ie)}, status_code=500)
+        logging.error("Internal error deleting database: %s", str(ie))
+        return JSONResponse(
+            content={"error": "Failed to delete database"},
+            status_code=500
+        )

@@ -529,7 +529,7 @@ const Index = () => {
               </DropdownMenu>
               <Button 
                 variant="outline" 
-                className="bg-blue-600 border-blue-500 text-white hover:bg-blue-700 flex-1 md:flex-initial"
+                className="bg-purple-600 border-purple-500 text-white hover:bg-purple-700 hover:border-purple-600 hover:text-white flex-1 md:flex-initial shadow-sm hover:shadow-md transition-all"
                 onClick={handleConnectDatabase}
               >
                   <span className="hidden sm:inline">Connect to Database</span>

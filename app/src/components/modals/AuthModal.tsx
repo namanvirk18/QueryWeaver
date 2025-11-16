@@ -1,9 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Github, AlertCircle } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { Github } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AuthService } from "@/services/auth";
 
 interface AuthModalProps {
@@ -12,7 +10,6 @@ interface AuthModalProps {
 }
 
 const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
-  const { login } = useAuth();
   const { toast } = useToast();
 
   const handleGoogleSignIn = async () => {
@@ -41,10 +38,6 @@ const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
     }
   };
 
-  const handleSkip = () => {
-    onOpenChange(false);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[450px] bg-card border-border">
@@ -56,13 +49,6 @@ const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
             Sign in to save your databases and queries
           </DialogDescription>
         </DialogHeader>
-        
-        <Alert className="bg-blue-900/20 border-blue-800">
-          <AlertCircle className="h-4 w-4 text-blue-400" />
-          <AlertDescription className="text-sm text-blue-200">
-            <strong>Note:</strong> Sign in to save databases and queries. You can also use the app without signing in!
-          </AlertDescription>
-        </Alert>
         
         <div className="space-y-3 mt-4">
           {/* OAuth buttons - Try to use them, gracefully fall back if not configured */}
@@ -98,29 +84,7 @@ const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
             <Github className="w-5 h-5 mr-3" />
             Sign in with GitHub
           </Button>
-
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-gray-600" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Or</span>
-            </div>
-          </div>
-
-          {/* Close modal button */}
-          <Button
-            onClick={handleSkip}
-            variant="outline"
-            className="w-full border-gray-600 text-gray-300 hover:bg-gray-800"
-          >
-            Continue Without Sign In
-          </Button>
         </div>
-
-        <p className="text-xs text-center text-muted-foreground mt-4">
-          Need help? See <a href="/QUICKSTART.md" className="text-blue-400 hover:underline">QUICKSTART.md</a> for setup instructions
-        </p>
       </DialogContent>
     </Dialog>
   );

@@ -36,9 +36,14 @@ const DatabaseModal = ({ open, onOpenChange }: DatabaseModalProps) => {
 
   const addStep = (message: string, status: 'pending' | 'success' | 'error' = 'pending') => {
     setConnectionSteps(prev => {
-      // Mark the previous pending step as success when adding a new step
       const updated = prev.map((step, index) => {
-        if (index === prev.length - 1 && step.status === 'pending') {
+        if (index !== prev.length - 1 || step.status !== 'pending') {
+          return step;
+        }
+        if (status === 'error') {
+          return { ...step, status: 'error' as const };
+        }
+        if (status !== 'pending') {
           return { ...step, status: 'success' as const };
         }
         return step;

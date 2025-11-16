@@ -40,6 +40,7 @@ const QueryInput = ({ onSubmit, placeholder = "Ask me anything about your databa
         size="icon"
         className="absolute right-2 bottom-2 bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
         disabled={!query.trim() || disabled}
+        aria-label="Send query"
       >
         <Send className="w-4 h-4" />
       </Button>

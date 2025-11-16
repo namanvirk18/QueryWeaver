@@ -12,7 +12,7 @@ import SuggestionCards from "../SuggestionCards";
 import { ChatService } from "@/services/chat";
 import type { ConversationMessage } from "@/types/api";
 
-interface ChatMessage {
+interface ChatMessageData {
   id: string;
   type: 'user' | 'ai' | 'ai-steps' | 'sql-query' | 'query-result';
   content: string;
@@ -66,7 +66,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
   );
 
   const { user } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const [messages, setMessages] = useState<ChatMessageData[]>([
     {
       id: "1",
       type: "ai",
@@ -101,7 +101,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
     setIsProcessing(true);
     
     // Add user message
-    const userMessage: ChatMessage = {
+    const userMessage: ChatMessageData = {
       id: Date.now().toString(),
       type: "user",
       content: query,
@@ -146,7 +146,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
           const stepText = message.content || message.message || '';
           console.log('🔄 Adding reasoning step as AI message:', stepText);
           
-          const stepMessage: ChatMessage = {
+          const stepMessage: ChatMessageData = {
             id: `step-${Date.now()}-${Math.random()}`,
             type: "ai",
             content: stepText,
@@ -211,7 +211,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
 
       // Add SQL query message with analysis info (even if SQL is empty)
       if (sqlQuery !== undefined || Object.keys(analysisInfo).length > 0) {
-        const sqlMessage: ChatMessage = {
+        const sqlMessage: ChatMessageData = {
           id: (Date.now() + 2).toString(),
           type: "sql-query",
           content: sqlQuery,
@@ -223,7 +223,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       
       // Add query results table if available
       if (queryResults && queryResults.length > 0) {
-        const resultsMessage: ChatMessage = {
+        const resultsMessage: ChatMessageData = {
           id: (Date.now() + 3).toString(),
           type: "query-result",
           content: "Query Results",
@@ -235,7 +235,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       
       // Add AI final response if we have one
       if (finalContent) {
-        const finalResponse: ChatMessage = {
+        const finalResponse: ChatMessageData = {
           id: (Date.now() + 4).toString(),
           type: "ai",
           content: finalContent,
@@ -254,7 +254,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
     } catch (error) {
       console.error('Query failed:', error);
       
-      const errorMessage: ChatMessage = {
+      const errorMessage: ChatMessageData = {
         id: (Date.now() + 2).toString(),
         type: "ai",
         content: `Failed to process query: ${error instanceof Error ? error.message : 'Unknown error'}`,

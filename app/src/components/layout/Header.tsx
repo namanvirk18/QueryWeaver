@@ -17,17 +17,29 @@ const Header = ({ onConnectDatabase, onUploadSchema }: HeaderProps) => {
   const [githubStars, setGithubStars] = useState<string>('-');
 
   useEffect(() => {
-    // Fetch GitHub stars for QueryWeaver repo
-    fetch('https://api.github.com/repos/FalkorDB/QueryWeaver')
-      .then(response => response.json())
+    const controller = new AbortController();
+    
+    fetch('https://api.github.com/repos/FalkorDB/QueryWeaver', {
+      signal: controller.signal,
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`GitHub API responded with status ${response.status}`);
+        }
+        return response.json();
+      })
       .then(data => {
         if (data.stargazers_count) {
           setGithubStars(data.stargazers_count.toLocaleString());
         }
       })
       .catch(error => {
-        console.log('Failed to fetch GitHub stars:', error);
+        if (error.name !== 'AbortError') {
+          console.warn('Failed to fetch GitHub stars:', error);
+        }
       });
+    
+    return () => controller.abort();
   }, []);
 
   return (

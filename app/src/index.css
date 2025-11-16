@@ -307,7 +307,11 @@ All colors MUST be HSL.
   .scrollbar-visible {
     /* Firefox */
     scrollbar-width: auto;
-    scrollbar-color: #6B7280 #374151;
+  }
+
+  /* Light mode scrollbar colors */
+  .scrollbar-visible {
+    scrollbar-color: #D1D5DB #F3F4F6;
   }
 
   .scrollbar-visible::-webkit-scrollbar {
@@ -316,15 +320,15 @@ All colors MUST be HSL.
   }
 
   .scrollbar-visible::-webkit-scrollbar-track {
-    background: #374151;
+    background: #F3F4F6;
     border-radius: 6px;
     margin: 2px;
   }
 
   .scrollbar-visible::-webkit-scrollbar-thumb {
-    background: #6B7280;
+    background: #D1D5DB;
     border-radius: 6px;
-    border: 2px solid #374151;
+    border: 2px solid #F3F4F6;
   }
 
   .scrollbar-visible::-webkit-scrollbar-thumb:hover {
@@ -332,6 +336,30 @@ All colors MUST be HSL.
   }
 
   .scrollbar-visible::-webkit-scrollbar-corner {
+    background: #F3F4F6;
+  }
+
+  /* Dark mode scrollbar colors */
+  .dark .scrollbar-visible {
+    scrollbar-color: #6B7280 #374151;
+  }
+
+  .dark .scrollbar-visible::-webkit-scrollbar-track {
+    background: #374151;
+    border: 2px solid #374151;
+  }
+
+  .dark .scrollbar-visible::-webkit-scrollbar-thumb {
+    background: #6B7280;
+    border-radius: 6px;
+    border: 2px solid #374151;
+  }
+
+  .dark .scrollbar-visible::-webkit-scrollbar-thumb:hover {
+    background: #9CA3AF;
+  }
+
+  .dark .scrollbar-visible::-webkit-scrollbar-corner {
     background: #374151;
   }
 }
