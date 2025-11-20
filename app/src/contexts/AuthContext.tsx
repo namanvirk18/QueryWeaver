@@ -7,8 +7,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: {
-    google: () => void;
-    github: () => void;
+    google: () => Promise<void>;
+    github: () => Promise<void>;
   };
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;

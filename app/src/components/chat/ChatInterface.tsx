@@ -88,7 +88,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
 
   const handleSendMessage = async (query: string) => {
     if (isProcessing) return; // Prevent multiple submissions
-    
+
     if (!selectedGraph) {
       toast({
         title: "No Database Available",
@@ -97,9 +97,13 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       });
       return;
     }
-    
+
+    // Snapshot history before adding the current user message so the backend
+    // sees only prior turns in `history` and the current query in `query`.
+    const historySnapshot = [...conversationHistory.current];
+
     setIsProcessing(true);
-    
+
     // Add user message
     const userMessage: ChatMessageData = {
       id: Date.now().toString(),
@@ -107,7 +111,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       content: query,
       timestamp: new Date(),
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
     conversationHistory.current.push({ role: 'user', content: query });
     
@@ -137,7 +141,7 @@ const ChatInterface = ({ className }: ChatInterfaceProps) => {
       for await (const message of ChatService.streamQuery({
         query,
         database: selectedGraph.id,
-        history: conversationHistory.current,
+        history: historySnapshot,
       })) {
         console.log('📨 Received stream message:', message);
         

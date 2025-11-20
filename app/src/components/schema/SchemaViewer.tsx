@@ -188,10 +188,10 @@ const SchemaViewer = ({ isOpen, onClose, onWidthChange, sidebarWidth = 64 }: Sch
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
-      
-      const newWidth = e.clientX - 64;
+
+      const newWidth = e.clientX - sidebarWidth;
       const maxWidth = Math.floor(window.innerWidth * MAX_WIDTH_PERCENT);
-      
+
       if (newWidth >= MIN_WIDTH && newWidth <= maxWidth) {
         setWidth(newWidth);
       }
@@ -214,7 +214,7 @@ const SchemaViewer = ({ isOpen, onClose, onWidthChange, sidebarWidth = 64 }: Sch
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-  }, [isResizing]);
+  }, [isResizing, sidebarWidth]);
 
   const loadSchemaData = async () => {
     if (!selectedGraph) return;

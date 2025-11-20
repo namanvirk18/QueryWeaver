@@ -153,22 +153,24 @@ const Index = () => {
 
     try {
       await DatabaseService.deleteGraph(databaseToDelete.id);
-      
+
       toast({
         title: "Database Deleted",
         description: `Successfully deleted "${databaseToDelete.name}"`,
       });
-      
-      // Refresh the graphs list
-      window.location.reload(); // Simple approach - could be improved with context refresh
+
+      // Close modal before refresh
+      setShowDeleteModal(false);
+      setDatabaseToDelete(null);
+
+      // Refresh the graphs list (can be replaced with a context refresh later)
+      window.location.reload();
     } catch (error) {
       toast({
         title: "Delete Failed",
         description: error instanceof Error ? error.message : "Failed to delete database",
         variant: "destructive",
       });
-    } finally {
-      setDatabaseToDelete(null);
     }
   };
 

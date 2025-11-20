@@ -270,7 +270,7 @@ const TokensModal: React.FC<TokensModalProps> = ({ open, onOpenChange }) => {
               Are you sure you want to delete this token? This action cannot be undone.
               <br />
               <br />
-              <strong>Token ending in:</strong> {deleteTokenId}
+              <strong>Token ending in:</strong> {deleteTokenId?.slice(-6)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -112,7 +112,10 @@ const DatabaseModal = ({ open, onOpenChange }: DatabaseModalProps) => {
       }
 
       // Process streaming response
-      const reader = response.body!.getReader();
+      if (!response.body) {
+        throw new Error('Streaming response has no body');
+      }
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       const delimiter = API_CONFIG.STREAM_BOUNDARY;

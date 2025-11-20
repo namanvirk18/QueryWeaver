@@ -29,7 +29,7 @@ const Header = ({ onConnectDatabase, onUploadSchema }: HeaderProps) => {
         return response.json();
       })
       .then(data => {
-        if (data.stargazers_count) {
+        if (typeof data.stargazers_count === "number") {
           setGithubStars(data.stargazers_count.toLocaleString());
         }
       })
