@@ -4,9 +4,9 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-fastapi = "~=0.118.0"
-uvicorn = "~=0.37.0"
-litellm = "~=1.77.3"
+fastapi = "~=0.121.3"
+uvicorn = "~=0.38.0"
+litellm = "~=1.80.5"
 falkordb = "~=1.2.0"
 psycopg2-binary = "~=2.9.11"
 pymysql = "~=1.1.0"
@@ -21,7 +21,7 @@ fastmcp = "~=2.13.1"
 
 [dev-packages]
 pytest = "~=8.4.2"
-pylint = "~=3.3.4"
+pylint = "~=4.0.3"
 playwright = "~=1.55.0"
 pytest-playwright = "~=0.7.1"
 pytest-asyncio = "~=1.2.0"
