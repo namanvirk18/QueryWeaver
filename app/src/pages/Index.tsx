@@ -34,6 +34,7 @@ const Index = () => {
   const [showSchemaViewer, setShowSchemaViewer] = useState(false);
   const [showTokensModal, setShowTokensModal] = useState(false);
   const [isRefreshingSchema, setIsRefreshingSchema] = useState(false);
+  const [isChatProcessing, setIsChatProcessing] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
   );
@@ -125,7 +126,7 @@ const Index = () => {
   }, [authLoading, isAuthenticated]);
 
   const handleConnectDatabase = () => {
-    if (isRefreshingSchema) return;
+    if (isRefreshingSchema || isChatProcessing) return;
     setShowDatabaseModal(true);
   };
 
@@ -218,6 +219,15 @@ const Index = () => {
       toast({
         title: "No Database Selected",
         description: "Please select a database first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isChatProcessing) {
+      toast({
+        title: "Chat is Processing",
+        description: "Please wait for the current query to complete",
         variant: "destructive",
       });
       return;
@@ -509,22 +519,22 @@ const Index = () => {
         {/* Sub-header for controls */}
         <div className="px-6 py-4 border-b border-gray-700">
           <div className="flex gap-3 flex-wrap md:flex-nowrap">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed p-2"
                 onClick={handleRefreshSchema}
-                disabled={!selectedGraph || isRefreshingSchema}
-                title={selectedGraph ? (isRefreshingSchema ? 'Refreshing schema...' : 'Refresh Schema') : "Select a database first"}
+                disabled={!selectedGraph || isRefreshingSchema || isChatProcessing}
+                title={selectedGraph ? (isRefreshingSchema ? 'Refreshing schema...' : isChatProcessing ? 'Wait for query to complete' : 'Refresh Schema') : "Select a database first"}
               >
                 {isRefreshingSchema ? <LoadingSpinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700 flex-1 md:flex-initial"
-                    disabled={isRefreshingSchema}
-                    title={isRefreshingSchema ? 'Refreshing schema...' : undefined}
+                    disabled={isRefreshingSchema || isChatProcessing}
+                    title={isRefreshingSchema ? 'Refreshing schema...' : isChatProcessing ? 'Wait for query to complete' : undefined}
                   >
                     <span className="truncate">{selectedGraph?.name || 'Select Database'}</span>
                   </Button>
@@ -533,20 +543,20 @@ const Index = () => {
                   {graphs.map((graph) => {
                     const isDemo = graph.id.startsWith('general_');
                     return (
-                      <DropdownMenuItem 
+                      <DropdownMenuItem
                         key={graph.id}
                         className="hover:!bg-gray-700 flex items-center justify-between group"
-                        onClick={() => { if (!isRefreshingSchema) selectGraph(graph.id); }}
-                        disabled={isRefreshingSchema}
+                        onClick={() => { if (!isRefreshingSchema && !isChatProcessing) selectGraph(graph.id); }}
+                        disabled={isRefreshingSchema || isChatProcessing}
                       >
                         <span>{graph.name}</span>
                         <Button
                           variant="ghost"
                           size="sm"
                           className={`h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${
-                            isDemo || isRefreshingSchema ? 'cursor-not-allowed opacity-40' : 'hover:bg-red-600 hover:text-white'
+                            isDemo || isRefreshingSchema || isChatProcessing ? 'cursor-not-allowed opacity-40' : 'hover:bg-red-600 hover:text-white'
                           }`}
-                          onClick={(e) => { if (isDemo || isRefreshingSchema) return; handleDeleteGraph(graph.id, graph.name, e); }}
+                          onClick={(e) => { if (isDemo || isRefreshingSchema || isChatProcessing) return; handleDeleteGraph(graph.id, graph.name, e); }}
                           disabled={isDemo || isRefreshingSchema}
                           title={isDemo ? 'Demo databases cannot be deleted' : (isRefreshingSchema ? 'Refreshing schema...' : `Delete ${graph.name}`)}
                         >
@@ -562,12 +572,12 @@ const Index = () => {
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="bg-purple-600 border-purple-500 text-white hover:bg-purple-700 hover:border-purple-600 hover:text-white flex-1 md:flex-initial shadow-sm hover:shadow-md transition-all"
                 onClick={handleConnectDatabase}
-                disabled={isRefreshingSchema}
-                title={isRefreshingSchema ? 'Refreshing schema...' : undefined}
+                disabled={isRefreshingSchema || isChatProcessing}
+                title={isRefreshingSchema ? 'Refreshing schema...' : isChatProcessing ? 'Wait for query to complete' : undefined}
               >
                   <span className="hidden sm:inline">Connect to Database</span>
                   <span className="sm:hidden">Connect DB</span>
@@ -587,7 +597,10 @@ const Index = () => {
         {/* Chat Interface - Full remaining height */}
         <div className="flex-1 overflow-hidden flex justify-center">
           <div className="h-full w-full max-w-7xl md:px-[15px]">
-            <ChatInterface disabled={isRefreshingSchema} />
+            <ChatInterface
+              disabled={isRefreshingSchema}
+              onProcessingChange={setIsChatProcessing}
+            />
           </div>
         </div>
       </div>

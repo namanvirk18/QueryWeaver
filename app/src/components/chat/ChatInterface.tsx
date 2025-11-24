@@ -33,9 +33,10 @@ interface ChatMessageData {
 export interface ChatInterfaceProps {
   className?: string;
   disabled?: boolean; // when true, block interactions
+  onProcessingChange?: (isProcessing: boolean) => void; // callback to notify parent of processing state
 }
 
-const ChatInterface = ({ className, disabled = false }: ChatInterfaceProps) => {
+const ChatInterface = ({ className, disabled = false, onProcessingChange }: ChatInterfaceProps) => {
   const { toast } = useToast();
   const { selectedGraph } = useDatabase();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -99,6 +100,11 @@ const ChatInterface = ({ className, disabled = false }: ChatInterfaceProps) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isProcessing]);
+
+  // Notify parent component of processing state changes
+  useEffect(() => {
+    onProcessingChange?.(isProcessing);
+  }, [isProcessing, onProcessingChange]);
 
   const handleSendMessage = async (query: string) => {
   if (isProcessing || disabled) return; // Prevent multiple submissions or when disabled by parent
