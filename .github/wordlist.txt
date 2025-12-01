@@ -90,3 +90,8 @@ socio
 sexualized
 www
 faq
+sanitization
+Sanitization
+JOINs
+subqueries
+subquery
