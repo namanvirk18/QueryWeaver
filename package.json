@@ -1,8 +1,12 @@
 {
   "dependencies": {
+    "playwright": "^1.57.0",
     "queryweaver-app": "file:app"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^24.10.2",
     "tailwindcss-animate": "^1.0.7"
-  }
+  },
+  "scripts": {}
 }
