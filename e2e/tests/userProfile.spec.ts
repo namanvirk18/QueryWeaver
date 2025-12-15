@@ -15,6 +15,17 @@ test.describe('User Profile Tests', () => {
     await browser.closeBrowser();
   });
 
+  test('GitHub repository link is visible and correct', async () => {
+    const userProfile = await browser.createNewPage(UserProfile, getBaseUrl());
+    await browser.setPageToFullScreen();
+
+    const isGitHubLinkVisible = await userProfile.isGitHubLinkVisible();
+    expect(isGitHubLinkVisible).toBeTruthy();
+
+    const gitHubUrl = await userProfile.getGitHubLinkUrl();
+    expect(gitHubUrl).toBe('https://github.com/FalkorDB/QueryWeaver');
+  });
+
   test('viewable email and username fields in user dropdown', async () => {
     const userProfile = await browser.createNewPage(UserProfile, getBaseUrl());
     await browser.setPageToFullScreen();
@@ -34,7 +45,7 @@ test.describe('User Profile Tests', () => {
     expect(userEmail).toContain('@');
   });
 
-  test.skip('logout button functionality', async () => {
+  test('logout button functionality', async () => {
     const userProfile = await browser.createNewPage(UserProfile, getBaseUrl());
     await browser.setPageToFullScreen();
 
@@ -239,7 +250,6 @@ test.describe('User Profile Tests', () => {
     // Get last token ID (the newly created one)
     await userProfile1.waitForTimeout(1000);
     const lastTokenIdUser1 = await userProfile1.getLastTokenIdFromRows();
-    console.log(`User1 created token ID: ${lastTokenIdUser1}`);
     
     // Close user1's context (this will force a new context for user2)
     await browser.closeContext();

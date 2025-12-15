@@ -370,7 +370,7 @@ const Index = () => {
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors text-gray-300 hover:text-white"
                 title="View QueryWeaver on GitHub"
-                data-testid="github-stars-link"
+                data-testid="github-repo-link"
               >
                 <svg 
                   width="16" 

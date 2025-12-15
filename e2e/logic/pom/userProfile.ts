@@ -10,6 +10,10 @@ export class UserProfile extends BasePage {
 
   // ==================== LAYER 1: USER PROFILE LOCATORS ====================
 
+  private get gitHubLink(): Locator {
+    return this.page.getByTestId("github-repo-link");
+  }
+
   private get userMenuBtn(): Locator {
     return this.page.getByTestId("user-menu-trigger");
   }
@@ -388,5 +392,15 @@ export class UserProfile extends BasePage {
     }
 
     return false;
+  }
+
+  async isGitHubLinkVisible(): Promise<boolean> {
+    return await waitForElementToBeVisible(this.gitHubLink);
+  }
+
+  async getGitHubLinkUrl(): Promise<string | null> {
+    const isVisible = await waitForElementToBeVisible(this.gitHubLink);
+    if (!isVisible) throw new Error("GitHub link is not visible!");
+    return await this.gitHubLink.getAttribute('href');
   }
 }
