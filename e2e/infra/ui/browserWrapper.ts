@@ -18,13 +18,28 @@ export default class BrowserWrapper {
 
     private page: Page | null = null;
 
-    async createNewPage<T extends BasePage>(PageClass: new (page: Page) => T, url?: string) {
+    async createNewPage<T extends BasePage>(
+        PageClass: new (page: Page) => T, 
+        url?: string,
+        storageStatePath?: string
+    ) {
         if (!this.browser) {
             const projectName = test.info().project.name;
             this.browser = await launchBrowser(projectName);
         }
         if (!this.context) {
-            this.context = await this.browser.newContext();
+            const projectName = test.info().project.name;
+            const isFirefox = projectName.toLowerCase().includes('firefox');
+            
+            // Firefox doesn't support clipboard-read/write permissions
+            const contextOptions: any = isFirefox ? {} : { permissions: ['clipboard-read', 'clipboard-write'] };
+            
+            // Add storage state if provided
+            if (storageStatePath) {
+                contextOptions.storageState = storageStatePath;
+            }
+            
+            this.context = await this.browser.newContext(contextOptions);
         }
         if (!this.page) {
             this.page = await this.context.newPage();
@@ -71,8 +86,17 @@ export default class BrowserWrapper {
         }
     }
 
-    async closeBrowser() {
+    async closeContext() {
         await this.closePage();
+        
+        if (this.context) {
+            await this.context.close();
+            this.context = null;
+        }
+    }
+
+    async closeBrowser() {
+        await this.closeContext();
         
         if (this.browser) {
             await this.browser.close();

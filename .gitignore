@@ -31,4 +31,4 @@ demo_tokens.py
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
-e2e/.auth/user.json
+e2e/.auth/

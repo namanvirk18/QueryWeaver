@@ -402,9 +402,9 @@ const Index = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="bg-gray-800 border-gray-600 text-gray-200" align="end">
-                    <div className="px-3 py-2 border-b border-gray-600">
-                      <p className="text-sm font-medium text-gray-100">{user?.name}</p>
-                      <p className="text-xs text-gray-400">{user?.email}</p>
+                    <div className="px-3 py-2 border-b border-gray-600" data-testid="user-info-section">
+                      <p className="text-sm font-medium text-gray-100" data-testid="user-name-display">{user?.name}</p>
+                      <p className="text-xs text-gray-400" data-testid="user-email-display">{user?.email}</p>
                     </div>
                     <DropdownMenuItem className="hover:!bg-gray-700 cursor-pointer" onClick={() => setShowTokensModal(true)} data-testid="api-tokens-menu-item">
                       API Tokens
@@ -460,15 +460,15 @@ const Index = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="bg-gray-800 border-gray-600 text-gray-200" align="end">
-                    <div className="px-3 py-2 border-b border-gray-600">
-                      <p className="text-sm font-medium text-gray-100">{user?.name}</p>
-                      <p className="text-xs text-gray-400">{user?.email}</p>
+                    <div className="px-3 py-2 border-b border-gray-600" data-testid="user-info-section">
+                      <p className="text-sm font-medium text-gray-100" data-testid="user-name-display">{user?.name}</p>
+                      <p className="text-xs text-gray-400" data-testid="user-email-display">{user?.email}</p>
                     </div>
-                    <DropdownMenuItem className="hover:!bg-gray-700 cursor-pointer" onClick={() => setShowTokensModal(true)}>
+                    <DropdownMenuItem className="hover:!bg-gray-700 cursor-pointer" onClick={() => setShowTokensModal(true)} data-testid="api-tokens-menu-item">
                       API Tokens
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-gray-600" />
-                    <DropdownMenuItem className="hover:!bg-gray-700 cursor-pointer" onClick={handleLogout}>
+                    <DropdownMenuItem className="hover:!bg-gray-700 cursor-pointer" onClick={handleLogout} data-testid="logout-menu-item">
                       Logout
                     </DropdownMenuItem>
                   </DropdownMenuContent>
