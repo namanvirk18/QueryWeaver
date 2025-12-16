@@ -40,19 +40,16 @@ jobs:
     - name: Install frontend dependencies
       run: npm ci
     
-    # Build frontend
-    - name: Build frontend
-      run: npm run build
-      working-directory: ./app
-    
-    # Start Docker Compose services (test databases + FalkorDB)
+    # Start Docker Compose services (test databases)
     - name: Start test databases
       run: |
         docker compose -f e2e/docker-compose.test.yml up -d
         # Wait for databases to be healthy
         echo "Waiting for databases to be ready..."
-        sleep 10
+        sleep 20
         docker ps -a
+        # Verify all containers are running
+        docker compose -f e2e/docker-compose.test.yml ps
     
     # Start FalkorDB (Redis graph database)
     - name: Start FalkorDB
@@ -61,15 +58,32 @@ jobs:
         sleep 5
         docker ps -a
     
-    # Start the FastAPI application in background
+    # Start the FastAPI application with frontend build
     - name: Start FastAPI application
       run: |
-        pipenv run uvicorn api.index:app --host localhost --port 5000 &
+        # Build frontend and start server in background using Make
+        make run-prod > /tmp/uvicorn.log 2>&1 &
+        UVICORN_PID=$!
+        echo "Started server with PID: $UVICORN_PID"
         # Wait for app to start
         echo "Waiting for application to start..."
-        sleep 10
-        curl -f http://localhost:5000/ || (echo "Failed to start application" && exit 1)
+        for i in {1..30}; do
+          if curl -f http://localhost:5000/ 2>/dev/null; then
+            echo "Application started successfully!"
+            break
+          fi
+          echo "Waiting... attempt $i/30"
+          sleep 1
+          if [ $i -eq 30 ]; then
+            echo "Failed to start application after 30 seconds"
+            echo "=== Server logs ==="
+            cat /tmp/uvicorn.log
+            exit 1
+          fi
+        done
       env:
+        HOST: localhost
+        PORT: 5000
         PYTHONUNBUFFERED: 1
         FASTAPI_SECRET_KEY: test-secret-key-for-ci
         APP_ENV: development
