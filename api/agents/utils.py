@@ -32,7 +32,6 @@ def parse_response(response: str) -> Dict[str, Any]:
     try:
         # Try to find all JSON blocks (anything between { and })
         # and parse the last valid one (LLM sometimes corrects itself)
-        
         # Find all potential JSON blocks
         json_blocks = []
         depth = 0
