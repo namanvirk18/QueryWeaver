@@ -461,6 +461,9 @@ What this will do:
                                 database_type=db_type
                             )
                             
+                            if healing_result.get("healing_failed"):
+                                raise exec_error
+                            
                             yield json.dumps({
                                 "type": "healing_attempt",
                                 "final_response": False,
@@ -470,17 +473,21 @@ What this will do:
                             }) + MESSAGE_DELIMITER
                             
                             # Execute healed SQL
-                            query_results = loader_class.execute_sql_query(
-                                healing_result["sql_query"],
-                                db_url
-                            )
-                            answer_an["sql_query"] = healing_result["sql_query"]
-                            
-                            yield json.dumps({
-                                "type": "healing_success",
-                                "final_response": False,
-                                "message": "✅ Healed query executed successfully"
-                            }) + MESSAGE_DELIMITER
+                            try:
+                                query_results = loader_class.execute_sql_query(
+                                    healing_result["sql_query"],
+                                    db_url
+                                )
+                                answer_an["sql_query"] = healing_result["sql_query"]
+                                
+                                yield json.dumps({
+                                    "type": "healing_success",
+                                    "final_response": False,
+                                    "message": "✅ Healed query executed successfully"
+                                }) + MESSAGE_DELIMITER
+                            except Exception as healed_error:  # pylint: disable=broad-exception-caught
+                                logging.error("Healed query also failed: %s", str(healed_error))
+                                raise healed_error
                         if len(query_results) != 0:
                             yield json.dumps(
                                 {
