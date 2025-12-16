@@ -12,6 +12,7 @@ from redis import ResponseError
 from api.core.errors import GraphNotFoundError, InternalError, InvalidArgumentError
 from api.core.schema_loader import load_database
 from api.agents import AnalysisAgent, RelevancyAgent, ResponseFormatterAgent, FollowUpAgent
+from api.agents.healer_agent import HealerAgent
 from api.config import Config
 from api.extensions import db
 from api.graph import find, get_db_description
@@ -252,7 +253,7 @@ async def query_database(user_id: str, graph_id: str, chat_data: ChatRequest):  
         db_description, db_url = await get_db_description(graph_id)
 
         # Determine database type and get appropriate loader
-        _, loader_class = get_database_type_and_loader(db_url)
+        db_type, loader_class = get_database_type_and_loader(db_url)
 
         if not loader_class:
             overall_elapsed = time.perf_counter() - overall_start
@@ -309,40 +310,14 @@ async def query_database(user_id: str, graph_id: str, chat_data: ChatRequest):  
 
             logging.info("Starting SQL generation with analysis agent")
             answer_an = agent_an.get_analysis(
-                queries_history[-1], result, db_description, instructions, memory_context
+                queries_history[-1], result, db_description, instructions, memory_context,
+                db_type
             )
 
             # Initialize response variables
             user_readable_response = ""
             follow_up_result = ""
             execution_error = False
-
-            # Auto-quote table names with special characters (like dashes)
-            original_sql = answer_an['sql_query']
-            if original_sql:
-                # Extract known table names from the result schema
-                known_tables = {table[0] for table in result} if result else set()
-
-                # Determine database type and get appropriate quote character
-                db_type, _ = get_database_type_and_loader(db_url)
-                quote_char = DatabaseSpecificQuoter.get_quote_char(
-                    db_type or 'postgresql'
-                )
-
-                # Auto-quote identifiers with special characters
-                sanitized_sql, was_modified = (
-                    SQLIdentifierQuoter.auto_quote_identifiers(
-                        original_sql, known_tables, quote_char
-                    )
-                )
-
-                if was_modified:
-                    msg = (
-                        "SQL query auto-sanitized: quoted table names with "
-                        "special characters"
-                    )
-                    logging.info(msg)
-                    answer_an['sql_query'] = sanitized_sql
 
             logging.info("Generated SQL query: %s", answer_an['sql_query'])  # nosemgrep
             yield json.dumps(
@@ -360,6 +335,30 @@ async def query_database(user_id: str, graph_id: str, chat_data: ChatRequest):  
 
             # If the SQL query is valid, execute it using the postgres database db_url
             if answer_an["is_sql_translatable"]:
+                # Auto-quote table names with special characters (like dashes)
+                # Extract known table names from the result schema
+                known_tables = {table[0] for table in result} if result else set()
+
+                # Determine database type and get appropriate quote character
+                quote_char = DatabaseSpecificQuoter.get_quote_char(
+                    db_type or 'postgresql'
+                )
+
+                # Auto-quote identifiers with special characters
+                sanitized_sql, was_modified = (
+                    SQLIdentifierQuoter.auto_quote_identifiers(
+                        answer_an['sql_query'], known_tables, quote_char
+                    )
+                )
+
+                if was_modified:
+                    msg = (
+                        "SQL query auto-sanitized: quoted table names with "
+                        "special characters"
+                    )
+                    logging.info(msg)
+                    answer_an['sql_query'] = sanitized_sql
+
                 # Check if this is a destructive operation that requires confirmation
                 sql_query = answer_an["sql_query"]
                 sql_type = sql_query.strip().split()[0].upper() if sql_query else ""
@@ -441,10 +440,47 @@ What this will do:
                             loader_class.is_schema_modifying_query(sql_query)
                         )
 
-                        query_results = loader_class.execute_sql_query(
-                            answer_an["sql_query"],
-                            db_url
-                        )
+                        # Try executing the SQL query, with healing on failure
+                        try:
+                            query_results = loader_class.execute_sql_query(
+                                answer_an["sql_query"],
+                                db_url
+                            )
+                        except Exception as exec_error:  # pylint: disable=broad-exception-caught
+                            # Attempt healing
+                            step = {"type": "reasoning_step",
+                                    "final_response": False,
+                                    "message": "Step 2a: SQL execution failed, attempting to heal query..."}
+                            yield json.dumps(step) + MESSAGE_DELIMITER
+
+                            healing_result = HealerAgent().heal_query(
+                                failed_sql=answer_an["sql_query"],
+                                error_message=str(exec_error),
+                                db_description=db_description[:500] if db_description else "",
+                                question=queries_history[-1],
+                                database_type=db_type
+                            )
+                            
+                            yield json.dumps({
+                                "type": "healing_attempt",
+                                "final_response": False,
+                                "message": f"Query was automatically fixed. Changes made: {', '.join(healing_result.get('changes_made', []))}",
+                                "original_error": str(exec_error),
+                                "healed_sql": healing_result.get("sql_query", "")
+                            }) + MESSAGE_DELIMITER
+                            
+                            # Execute healed SQL
+                            query_results = loader_class.execute_sql_query(
+                                healing_result["sql_query"],
+                                db_url
+                            )
+                            answer_an["sql_query"] = healing_result["sql_query"]
+                            
+                            yield json.dumps({
+                                "type": "healing_success",
+                                "final_response": False,
+                                "message": "✅ Healed query executed successfully"
+                            }) + MESSAGE_DELIMITER
                         if len(query_results) != 0:
                             yield json.dumps(
                                 {
