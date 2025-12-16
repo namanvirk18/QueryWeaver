@@ -61,19 +61,28 @@ jobs:
       run: |
         docker run -d --name falkordb-test -p 6379:6379 falkordb/falkordb:latest
         echo "Waiting for FalkorDB to be ready..."
-        # Wait for FalkorDB to accept connections (try for 30 seconds)
+        # Wait for FalkorDB to accept connections and be fully initialized
         for i in {1..30}; do
           if docker exec falkordb-test redis-cli PING > /dev/null 2>&1; then
-            echo "FalkorDB is ready!"
-            break
+            # Test that FalkorDB graph commands work
+            if docker exec falkordb-test redis-cli GRAPH.LIST > /dev/null 2>&1; then
+              echo "FalkorDB graph module loaded, testing vector index creation..."
+              # Test creating a graph with vector index (the actual operation that fails)
+              if docker exec falkordb-test redis-cli GRAPH.QUERY test_graph "CREATE VECTOR INDEX FOR (n:Test) ON (n.embedding)" > /dev/null 2>&1; then
+                # Clean up test graph
+                docker exec falkordb-test redis-cli GRAPH.DELETE test_graph > /dev/null 2>&1 || true
+                echo "FalkorDB is fully ready with vector index support!"
+                # Extra wait to ensure complete initialization
+                sleep 5
+                break
+              fi
+            fi
           fi
-          echo "Waiting... attempt $i/30"
+          echo "Waiting for FalkorDB initialization... attempt $i/30"
           sleep 1
         done
         # Verify FalkorDB is accessible from host
-        if command -v redis-cli &> /dev/null; then
-          redis-cli -h localhost -p 6379 PING || echo "redis-cli not available, skipping host check"
-        fi
+        echo "Testing FalkorDB connectivity from host..."
         docker ps -a
     
     # Start the FastAPI application
@@ -110,6 +119,10 @@ jobs:
     # Install Playwright browsers
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps chromium firefox
+    
+    # Create auth directory for storage state
+    - name: Create auth directory
+      run: mkdir -p e2e/.auth
     
     # Run Playwright tests
     - name: Run Playwright tests

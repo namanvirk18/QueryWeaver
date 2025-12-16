@@ -6,8 +6,6 @@ import ApiCalls from '../logic/api/apiCalls';
 
 // Database connection tests - uses authenticated storageState from auth.setup
 test.describe('Database Connection Tests', () => {
-  // Increase timeout for these tests due to schema loading
-  test.setTimeout(60000);
   
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
