@@ -46,7 +46,8 @@ test.describe('User Profile Tests', () => {
   });
 
   test('logout button functionality', async () => {
-    const userProfile = await browser.createNewPage(UserProfile, getBaseUrl());
+    // Use user3 for logout test to avoid affecting other tests that use user1 and user2
+    const userProfile = await browser.createNewPage(UserProfile, getBaseUrl(), 'e2e/.auth/user3.json');
     await browser.setPageToFullScreen();
 
     await userProfile.clickOnUserMenu();
@@ -56,10 +57,19 @@ test.describe('User Profile Tests', () => {
 
     await userProfile.clickOnLogout();
 
-    // Wait for logout to complete and verify redirect to login page
-    await userProfile.waitForLoginUrl();
-    const currentUrl = await userProfile.getCurrentUrl();
-    expect(currentUrl).toContain('login');
+    // Wait for logout to complete
+    await userProfile.waitForTimeout(2000);
+
+    // Verify user is logged out - user menu should not be visible
+    const isUserMenuVisible = await userProfile.isUserMenuVisible();
+    expect(isUserMenuVisible).toBeFalsy();
+
+    // Verify welcome screen with login options is shown
+    const isGoogleLoginVisible = await userProfile.isGoogleLoginBtnVisible();
+    const isGithubLoginVisible = await userProfile.isGithubLoginBtnVisible();
+
+    // At least one login option should be visible
+    expect(isGoogleLoginVisible || isGithubLoginVisible).toBeTruthy();
   });
 
   test('generate token and copy token', async () => {

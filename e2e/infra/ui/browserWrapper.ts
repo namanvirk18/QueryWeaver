@@ -19,7 +19,7 @@ export default class BrowserWrapper {
     private page: Page | null = null;
 
     async createNewPage<T extends BasePage>(
-        PageClass: new (page: Page) => T, 
+        PageClass: new (page: Page) => T,
         url?: string,
         storageStatePath?: string
     ) {
@@ -27,18 +27,25 @@ export default class BrowserWrapper {
             const projectName = test.info().project.name;
             this.browser = await launchBrowser(projectName);
         }
+
+        // If storageStatePath is explicitly provided and context already exists,
+        // we need to close the existing context and create a new one with the new auth
+        if (storageStatePath && this.context) {
+            await this.closeContext();
+        }
+
         if (!this.context) {
             const projectName = test.info().project.name;
             const isFirefox = projectName.toLowerCase().includes('firefox');
-            
+
             // Firefox doesn't support clipboard-read/write permissions
             const contextOptions: any = isFirefox ? {} : { permissions: ['clipboard-read', 'clipboard-write'] };
-            
+
             // Add storage state if provided
             if (storageStatePath) {
                 contextOptions.storageState = storageStatePath;
             }
-            
+
             this.context = await this.browser.newContext(contextOptions);
         }
         if (!this.page) {

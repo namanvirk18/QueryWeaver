@@ -31,6 +31,15 @@ export const config = {
   },
 
   /**
+   * Third test user credentials for logout tests
+   * Override with TEST_USER3_EMAIL and TEST_USER3_PASSWORD environment variables
+   */
+  testUser3: {
+    email: process.env.TEST_USER3_EMAIL || 'test3@example.com',
+    password: process.env.TEST_USER3_PASSWORD || 'testpassword789',
+  },
+
+  /**
    * Test database connection URLs
    * Override with environment variables for local/CI testing
    */
@@ -59,6 +68,13 @@ export function getTestUser() {
  */
 export function getTestUser2() {
   return config.testUser2;
+}
+
+/**
+ * Get third test user credentials
+ */
+export function getTestUser3() {
+  return config.testUser3;
 }
 
 /**

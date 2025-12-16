@@ -9,6 +9,7 @@ env:
   PYTHON_VERSION: '3.12'
   NODE_VERSION: 'lts/*'
 
+
 jobs:
   test:
     timeout-minutes: 60
@@ -120,6 +121,10 @@ jobs:
         FASTAPI_DEBUG: False
         FALKORDB_URL: redis://localhost:6379
         DISABLE_MCP: true
+        # Azure OpenAI API keys - required for database schema analysis
+        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+        AZURE_API_BASE: ${{ secrets.AZURE_API_BASE }}
+        AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
     
     # Install Playwright browsers
     - name: Install Playwright Browsers

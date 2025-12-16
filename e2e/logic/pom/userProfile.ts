@@ -38,6 +38,15 @@ export class UserProfile extends BasePage {
     return this.page.getByTestId("logout-menu-item");
   }
 
+  // Login screen locators (for logout verification)
+  private get googleLoginBtn(): Locator {
+    return this.page.getByTestId("google-login-btn");
+  }
+
+  private get githubLoginBtn(): Locator {
+    return this.page.getByTestId("github-login-btn");
+  }
+
   // ==================== TOKENS MODAL LOCATORS ====================
 
   private get generateTokenBtn(): Locator {
@@ -245,6 +254,22 @@ export class UserProfile extends BasePage {
 
   async isLogoutMenuItemVisible(): Promise<boolean> {
     return await waitForElementToBeVisible(this.logoutMenuItem);
+  }
+
+  async isGoogleLoginBtnVisible(): Promise<boolean> {
+    try {
+      return await this.googleLoginBtn.isVisible();
+    } catch {
+      return false;
+    }
+  }
+
+  async isGithubLoginBtnVisible(): Promise<boolean> {
+    try {
+      return await this.githubLoginBtn.isVisible();
+    } catch {
+      return false;
+    }
   }
 
   async isGenerateTokenBtnVisible(): Promise<boolean> {
