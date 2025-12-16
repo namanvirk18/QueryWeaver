@@ -1,8 +1,6 @@
 -- MySQL Test Database Initialization
 -- This script runs automatically when the container starts
-
--- Use the test database
-USE testdb;
+-- MySQL automatically uses the database specified in MYSQL_DATABASE env var
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (

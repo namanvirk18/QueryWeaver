@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL test database (for regular tests)
   postgres-test:
