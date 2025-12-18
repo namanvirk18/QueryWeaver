@@ -18,6 +18,7 @@ from api.graph import find, get_db_description
 from api.loaders.postgres_loader import PostgresLoader
 from api.loaders.mysql_loader import MySQLLoader
 from api.memory.graphiti_tool import MemoryTool
+from api.sql_utils import SQLIdentifierQuoter, DatabaseSpecificQuoter
 
 # Use the same delimiter as in the JavaScript
 MESSAGE_DELIMITER = "|||FALKORDB_MESSAGE_BOUNDARY|||"
@@ -316,6 +317,33 @@ async def query_database(user_id: str, graph_id: str, chat_data: ChatRequest):  
             follow_up_result = ""
             execution_error = False
 
+            # Auto-quote table names with special characters (like dashes)
+            original_sql = answer_an['sql_query']
+            if original_sql:
+                # Extract known table names from the result schema
+                known_tables = {table[0] for table in result} if result else set()
+
+                # Determine database type and get appropriate quote character
+                db_type, _ = get_database_type_and_loader(db_url)
+                quote_char = DatabaseSpecificQuoter.get_quote_char(
+                    db_type or 'postgresql'
+                )
+
+                # Auto-quote identifiers with special characters
+                sanitized_sql, was_modified = (
+                    SQLIdentifierQuoter.auto_quote_identifiers(
+                        original_sql, known_tables, quote_char
+                    )
+                )
+
+                if was_modified:
+                    msg = (
+                        "SQL query auto-sanitized: quoted table names with "
+                        "special characters"
+                    )
+                    logging.info(msg)
+                    answer_an['sql_query'] = sanitized_sql
+
             logging.info("Generated SQL query: %s", answer_an['sql_query'])  # nosemgrep
             yield json.dumps(
                 {
@@ -590,7 +618,7 @@ What this will do:
     return generate()
 
 
-async def execute_destructive_operation(
+async def execute_destructive_operation(  # pylint: disable=too-many-statements
     user_id: str,
     graph_id: str,
     confirm_data: ConfirmRequest,
@@ -613,7 +641,7 @@ async def execute_destructive_operation(
         raise InvalidArgumentError("No SQL query provided")
 
     # Create a generator function for streaming the confirmation response
-    async def generate_confirmation():
+    async def generate_confirmation():  # pylint: disable=too-many-locals,too-many-statements
         # Create memory tool for saving query results
         memory_tool = await MemoryTool.create(user_id, graph_id)
 
@@ -634,6 +662,39 @@ async def execute_destructive_operation(
                 step = {"type": "reasoning_step",
                        "message": "Step 2: Executing confirmed SQL query"}
                 yield json.dumps(step) + MESSAGE_DELIMITER
+
+                # Auto-quote table names for confirmed destructive operations
+                sql_query = confirm_data.sql_query if hasattr(
+                    confirm_data, 'sql_query'
+                ) else ""
+                if sql_query:
+                    # Get schema to extract known tables
+                    graph = db.select_graph(graph_id)
+                    tables_query = "MATCH (t:Table) RETURN t.name"
+                    try:
+                        tables_res = (await graph.query(tables_query)).result_set
+                        known_tables = (
+                            {row[0] for row in tables_res}
+                            if tables_res else set()
+                        )
+                    except Exception:  # pylint: disable=broad-exception-caught
+                        known_tables = set()
+
+                    # Determine database type and get appropriate quote character
+                    db_type, _ = get_database_type_and_loader(db_url)
+                    quote_char = DatabaseSpecificQuoter.get_quote_char(
+                        db_type or 'postgresql'
+                    )
+
+                    # Auto-quote identifiers
+                    sanitized_sql, was_modified = (
+                        SQLIdentifierQuoter.auto_quote_identifiers(
+                            sql_query, known_tables, quote_char
+                        )
+                    )
+                    if was_modified:
+                        logging.info("Confirmed SQL query auto-sanitized")
+                        sql_query = sanitized_sql
 
                 # Check if this query modifies the database schema using appropriate loader
                 is_schema_modifying, operation_type = (
@@ -716,6 +777,7 @@ async def execute_destructive_operation(
 
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logging.error("Error executing confirmed SQL query: %s", str(e))  # nosemgrep
+                error_message = str(e) if str(e) else "Error executing query"
 
                 # Save failed confirmed query to memory
                 save_query_task = asyncio.create_task(
@@ -736,7 +798,7 @@ async def execute_destructive_operation(
                 )
 
                 yield json.dumps(
-                    {"type": "error", "message": "Error executing query"}
+                    {"type": "error", "message": error_message}
                 ) + MESSAGE_DELIMITER
         else:
             # User cancelled or provided invalid confirmation

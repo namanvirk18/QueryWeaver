@@ -46,6 +46,7 @@ npm
 deps
 backend
 Backend
+Vite
 dropdown
 cryptographically
 SHA
@@ -89,3 +90,8 @@ socio
 sexualized
 www
 faq
+sanitization
+Sanitization
+JOINs
+subqueries
+subquery
