@@ -119,7 +119,6 @@ class HealerAgent:
             additional_context += f"\nSyntax errors: {', '.join(validation_result['errors'])}"
         if validation_result["warnings"]:
             additional_context += f"\nWarnings: {', '.join(validation_result['warnings'])}"
-        
         # Enhance error message with validation context
         enhanced_error = error_message + additional_context
         
