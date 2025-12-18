@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { getBaseUrl } from '../config/urls';
+import { getBaseUrl, getTestUser3 } from '../config/urls';
 import { UserProfile } from '../logic/pom/userProfile';
 import BrowserWrapper from '../infra/ui/browserWrapper';
+import ApiCalls from '../logic/api/apiCalls';
 
 // User Profile tests - uses authenticated storageState from auth.setup
 test.describe('User Profile Tests', () => {
@@ -46,19 +47,32 @@ test.describe('User Profile Tests', () => {
   });
 
   test('logout button functionality', async () => {
-    // Use user3 for logout test to avoid affecting other tests that use user1 and user2
-    const userProfile = await browser.createNewPage(UserProfile, getBaseUrl(), 'e2e/.auth/user3.json');
+    // Step 1: Create page first (without navigation to get access to request context)
+    const userProfile = await browser.createNewPage(UserProfile, getBaseUrl());
     await browser.setPageToFullScreen();
+    
+    // Step 2: Login via API using user3 credentials and page's request context
+    const apiCall = new ApiCalls();
+    const { email, password } = getTestUser3();
+    
+    // Get the page to access its request context
+    const page = await browser.getPage();
+    
+    // Login via API using the page's request context - this shares cookies with the browser
+    const loginResponse = await apiCall.loginWithEmail(email, password, page.request);
+    expect(loginResponse.success).toBeTruthy();
 
+    // Step 3: Navigate to the page to establish the session in the browser
+    await page.goto(getBaseUrl());
+    await userProfile.waitForTimeout(1000);
+
+    // Step 4: Verify user is logged in and proceed with logout
     await userProfile.clickOnUserMenu();
 
     const isLogoutVisible = await userProfile.isLogoutMenuItemVisible();
     expect(isLogoutVisible).toBeTruthy();
 
     await userProfile.clickOnLogout();
-
-    // Wait for logout to complete
-    await userProfile.waitForTimeout(2000);
 
     // Verify user is logged out - user menu should not be visible
     const isUserMenuVisible = await userProfile.isUserMenuVisible();
