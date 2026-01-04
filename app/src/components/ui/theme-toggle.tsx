@@ -47,7 +47,7 @@ const ThemeToggle = () => {
         <TooltipTrigger asChild>
           <button
             onClick={toggleTheme}
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
             aria-label="Toggle theme"
             data-testid="theme-toggle"
           >

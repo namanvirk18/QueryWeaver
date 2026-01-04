@@ -107,7 +107,19 @@ const DatabaseModal = ({ open, onOpenChange }: DatabaseModalProps) => {
       });
 
       if (!response.ok) {
-        throw new Error(`Network response was not ok (${response.status})`);
+        const errorMessages: Record<number, string> = {
+          401: 'Not authenticated. Please sign in to connect databases.',
+          403: 'Access denied. You do not have permission to connect databases.',
+          500: 'Server error. Please try again later.',
+        };
+
+        // For 400, try to get server error message first
+        if (response.status === 400) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Invalid database connection URL.');
+        }
+
+        throw new Error(errorMessages[response.status] || `Failed to connect to database (${response.status})`);
       }
 
       // Process streaming response
