@@ -174,7 +174,7 @@ IMPORTANT:
         db_description: str = "",
         question: str = "",
         database_type: str = "sqlite"
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Iteratively heal and execute SQL query until success or max attempts.
         
         This method creates a conversation loop between the healer and the database:
