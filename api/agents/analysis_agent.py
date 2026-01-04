@@ -26,11 +26,15 @@ class AnalysisAgent(BaseAgent):
         if not self.messages or self.messages[0].get("role") != "system":
             self.messages.insert(0, {
                 "role": "system",
-                "content": f"You are a SQL expert. TARGET DATABASE: {database_type.upper() if database_type else 'UNKNOWN'}"
+                "content": (
+                    f"You are a SQL expert. TARGET DATABASE: "
+                    f"{database_type.upper() if database_type else 'UNKNOWN'}"
+                )
             })
-        
+
         prompt = self._build_prompt(
-            user_query, formatted_schema, db_description, instructions, memory_context, database_type
+            user_query, formatted_schema, db_description,
+            instructions, memory_context, database_type
         )
         self.messages.append({"role": "user", "content": prompt})
         completion_result = completion(
