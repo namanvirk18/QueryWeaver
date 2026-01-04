@@ -9,7 +9,7 @@ failed query to generate a corrected version.
 # pylint: disable=too-many-positional-arguments,broad-exception-caught
 
 import re
-from typing import Dict
+from typing import Dict, Callable, Any
 from litellm import completion
 from api.config import Config
 from .utils import parse_response
@@ -19,11 +19,13 @@ from .utils import parse_response
 class HealerAgent:
     """Agent specialized in fixing SQL syntax errors."""
     
-    def __init__(self):
+    def __init__(self, max_healing_attempts: int = 3):
+        """Initialize the healer agent.
+        
+        Args:
+            max_healing_attempts: Maximum number of healing attempts before giving up
         """
-        Initialize the HealerAgent.
-
-        """
+        self.max_healing_attempts = max_healing_attempts
     
     @staticmethod
     def validate_sql_syntax(sql_query: str) -> dict:
@@ -87,91 +89,6 @@ class HealerAgent:
             "warnings": warnings
         }
     
-    def heal_query(
-        self,
-        failed_sql: str,
-        error_message: str,
-        db_description: str = "",
-        question: str = "",
-        database_type: str = "sqlite"
-    ) -> Dict[str, any]:
-        """
-        Attempt to fix a failed SQL query using only the error message.
-        
-        Args:
-            failed_sql: The SQL query that failed
-            error_message: The error message from execution
-            db_description: Optional database description
-            question: Optional original question
-            database_type: Type of database (sqlite, postgresql, mysql, etc.)
-            
-        Returns:
-            Dict containing:
-                - sql_query: Fixed SQL query
-                - confidence: Confidence score
-                - explanation: Explanation of the fix
-                - changes_made: List of changes applied
-        """
-        # Validate SQL syntax for additional error context
-        validation_result = self.validate_sql_syntax(failed_sql)
-        additional_context = ""
-        if validation_result["errors"]:
-            additional_context += f"\nSyntax errors: {', '.join(validation_result['errors'])}"
-        if validation_result["warnings"]:
-            additional_context += f"\nWarnings: {', '.join(validation_result['warnings'])}"
-        # Enhance error message with validation context
-        enhanced_error = error_message + additional_context
-        
-        # Build focused prompt for SQL healing
-        prompt = self._build_healing_prompt(
-            failed_sql=failed_sql,
-            error_message=enhanced_error,
-            db_description=db_description,
-            question=question,
-            database_type=database_type
-        )
-        
-        try:
-            # Call LLM for healing
-            response = completion(
-                model=Config.COMPLETION_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1,  # Low temperature for precision
-                max_tokens=2000
-            )
-            
-            content = response.choices[0].message.content
-            
-            # Parse the response
-            result = parse_response(content)
-            
-            # Validate the result has required fields
-            if not result.get("sql_query"):
-                return {
-                    "sql_query": failed_sql,  # Return original if healing failed
-                    "confidence": 0.0,
-                    "explanation": "Failed to parse healed SQL from response",
-                    "changes_made": [],
-                    "healing_failed": True
-                }
-            
-            return {
-                "sql_query": result.get("sql_query", ""),
-                "confidence": result.get("confidence", 50),
-                "explanation": result.get("explanation", ""),
-                "changes_made": result.get("changes_made", []),
-                "healing_failed": False
-            }
-            
-        except Exception as e:
-            return {
-                "sql_query": failed_sql,  # Return original on error
-                "confidence": 0.0,
-                "explanation": f"Healing error: {str(e)}",
-                "changes_made": [],
-                "healing_failed": True
-            }
-    
     def _build_healing_prompt(
         self,
         failed_sql: str,
@@ -199,7 +116,7 @@ EXECUTION ERROR:
 
 {f"ORIGINAL QUESTION: {question}" if question else ""}
 
-{f"DATABASE INFO: {db_description[:500]}" if db_description else ""}
+{f"DATABASE INFO: {db_description}"}
 
 COMMON ERROR PATTERNS:
 {error_hints}
@@ -248,6 +165,120 @@ IMPORTANT:
 """
         
         return prompt
+    
+    def heal_and_execute(
+        self,
+        initial_sql: str,
+        initial_error: str,
+        execute_sql_func: Callable[[str], Any],
+        db_description: str = "",
+        question: str = "",
+        database_type: str = "sqlite"
+    ) -> Dict[str, any]:
+        """Iteratively heal and execute SQL query until success or max attempts.
+        
+        This method creates a conversation loop between the healer and the database:
+        1. Build initial prompt once with the failed SQL and error (including syntax validation)
+        2. Loop: Call LLM → Parse healed SQL → Execute → Check if successful
+        3. If successful, return results
+        4. If failed and not last attempt, add error feedback and repeat
+        5. If failed on last attempt, return failure
+        
+        Args:
+            initial_sql: The initial SQL query that failed
+            initial_error: The error message from the initial execution failure
+            execute_sql_func: Function that executes SQL and returns results or raises exception
+            db_description: Optional database description
+            question: Optional original question
+            database_type: Type of database (sqlite, postgresql, mysql, etc.)
+            
+        Returns:
+            Dict containing:
+                - success: Whether healing succeeded
+                - sql_query: Final SQL query (healed or original)
+                - query_results: Results from successful execution (if success=True)
+                - attempts: Number of healing attempts made
+                - final_error: Final error message (if success=False)
+        """
+        self.messages = []
+        
+        # Validate SQL syntax for additional error context
+        validation_result = self.validate_sql_syntax(initial_sql)
+        additional_context = ""
+        if validation_result["errors"]:
+            additional_context += f"\nSyntax errors: {', '.join(validation_result['errors'])}"
+        if validation_result["warnings"]:
+            additional_context += f"\nWarnings: {', '.join(validation_result['warnings'])}"
+        # Enhance error message with validation context
+        enhanced_error = initial_error + additional_context
+        
+        # Build initial prompt once before the loop
+        prompt = self._build_healing_prompt(
+            failed_sql=initial_sql,
+            error_message=enhanced_error,
+            db_description=db_description,
+            question=question,
+            database_type=database_type
+        )
+        self.messages.append({"role": "user", "content": prompt})
+        
+        for attempt in range(self.max_healing_attempts):
+            # Call LLM
+            response = completion(
+                model=Config.COMPLETION_MODEL,
+                messages=self.messages,
+                temperature=0.1,
+                max_tokens=2000
+            )
+            
+            content = response.choices[0].message.content
+            self.messages.append({"role": "assistant", "content": content})
+            
+            # Parse response
+            result = parse_response(content)
+            healed_sql = result.get("sql_query", "")
+            
+            # Execute against database
+            error = None
+            try:
+                query_results = execute_sql_func(healed_sql)
+            except Exception as e:
+                error = str(e)
+            
+            # Check if it worked
+            if error is None:
+                # Success!
+                return {
+                    "success": True,
+                    "sql_query": healed_sql,
+                    "query_results": query_results,
+                    "attempts": attempt + 1,
+                    "final_error": None
+                }
+            
+            # Failed - check if last attempt
+            if attempt >= self.max_healing_attempts - 1:
+                return {
+                    "success": False,
+                    "sql_query": healed_sql,
+                    "query_results": None,
+                    "attempts": attempt + 1,
+                    "final_error": error
+                }
+            
+            # Not last attempt - add feedback and continue
+            feedback = f"""The healed query failed with error:
+
+```sql
+{healed_sql}
+```
+
+ERROR:
+{error}
+
+Please fix this error."""
+            self.messages.append({"role": "user", "content": feedback})
+        
     
     def _analyze_error(self, error_message: str, database_type: str) -> str:
         """Analyze error message and provide targeted hints."""

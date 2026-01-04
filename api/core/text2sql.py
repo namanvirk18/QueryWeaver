@@ -441,56 +441,76 @@ What this will do:
                             loader_class.is_schema_modifying_query(sql_query)
                         )
 
-                        # Try executing the SQL query, with healing on failure
+                        # Try executing the SQL query first
                         try:
                             query_results = loader_class.execute_sql_query(
                                 answer_an["sql_query"],
                                 db_url
                             )
                         except Exception as exec_error:  # pylint: disable=broad-exception-caught
-                            # Attempt healing
+                            # Initial execution failed - start iterative healing process
                             step = {
                                 "type": "reasoning_step",
-                                    "final_response": False,
-                                    "message": "Step 2a: SQL execution failed, attempting to heal query..."
-                                    }
+                                "final_response": False,
+                                "message": "Step 2a: SQL execution failed, attempting to heal query..."
+                            }
                             yield json.dumps(step) + MESSAGE_DELIMITER
 
-                            healing_result = HealerAgent().heal_query(
-                                failed_sql=answer_an["sql_query"],
-                                error_message=str(exec_error),
+                            # Create healer agent and attempt iterative healing
+                            healer_agent = HealerAgent(max_healing_attempts=3)
+                            
+                            # Create a wrapper function for execute_sql_query
+                            def execute_sql(sql: str):
+                                return loader_class.execute_sql_query(sql, db_url)
+                            
+                            healing_result = healer_agent.heal_and_execute(
+                                initial_sql=answer_an["sql_query"],
+                                initial_error=str(exec_error),
+                                execute_sql_func=execute_sql,
                                 db_description=db_description,
                                 question=queries_history[-1],
                                 database_type=db_type
                             )
                             
-                            if healing_result.get("healing_failed"):
+                            if not healing_result.get("success"):
+                                # Healing failed after all attempts
+                                yield json.dumps({
+                                    "type": "healing_failed",
+                                    "final_response": False,
+                                    "message": f"❌ Failed to heal query after {healing_result['attempts']} attempt(s)",
+                                    "final_error": healing_result.get("final_error", str(exec_error)),
+                                    "healing_log": healing_result.get("healing_log", [])
+                                }) + MESSAGE_DELIMITER
                                 raise exec_error
                             
-                            yield json.dumps({
-                                "type": "healing_attempt",
-                                "final_response": False,
-                                "message": f"Query was automatically fixed. Changes made: {', '.join(healing_result.get('changes_made', []))}",
-                                "original_error": str(exec_error),
-                                "healed_sql": healing_result.get("sql_query", "")
-                            }) + MESSAGE_DELIMITER
+                            # Healing succeeded!
+                            healing_log = healing_result.get("healing_log", [])
                             
-                            # Execute healed SQL
-                            try:
-                                query_results = loader_class.execute_sql_query(
-                                    healing_result["sql_query"],
-                                    db_url
-                                )
-                                answer_an["sql_query"] = healing_result["sql_query"]
-                                
-                                yield json.dumps({
-                                    "type": "healing_success",
-                                    "final_response": False,
-                                    "message": "✅ Healed query executed successfully"
-                                }) + MESSAGE_DELIMITER
-                            except Exception as healed_error:  # pylint: disable=broad-exception-caught
-                                logging.error("Healed query also failed: %s", str(healed_error))
-                                raise healed_error
+                            # Show healing progress
+                            for log_entry in healing_log:
+                                if log_entry.get("status") == "healed":
+                                    changes_msg = ", ".join(log_entry.get("changes_made", []))
+                                    yield json.dumps({
+                                        "type": "healing_attempt",
+                                        "final_response": False,
+                                        "message": f"Attempt {log_entry['attempt']}: {changes_msg}",
+                                        "attempt": log_entry["attempt"],
+                                        "changes": log_entry.get("changes_made", []),
+                                        "confidence": log_entry.get("confidence", 0)
+                                    }) + MESSAGE_DELIMITER
+                            
+                            # Update the SQL query to the healed version
+                            answer_an["sql_query"] = healing_result["sql_query"]
+                            query_results = healing_result["query_results"]
+                            
+                            yield json.dumps({
+                                "type": "healing_success",
+                                "final_response": False,
+                                "message": f"✅ Query healed and executed successfully after {healing_result['attempts'] + 1} attempt(s)",
+                                "healed_sql": healing_result["sql_query"],
+                                "attempts": healing_result["attempts"] + 1
+                            }) + MESSAGE_DELIMITER
+
                         if len(query_results) != 0:
                             yield json.dumps(
                                 {
