@@ -18,18 +18,29 @@ class AnalysisAgent(BaseAgent):
         db_description: str,
         instructions: str | None = None,
         memory_context: str | None = None,
+        database_type: str | None = None,
     ) -> dict:
         """Get analysis of user query against database schema."""
         formatted_schema = self._format_schema(combined_tables)
+        # Add system message with database type if not already present
+        if not self.messages or self.messages[0].get("role") != "system":
+            self.messages.insert(0, {
+                "role": "system",
+                "content": (
+                    f"You are a SQL expert. TARGET DATABASE: "
+                    f"{database_type.upper() if database_type else 'UNKNOWN'}"
+                )
+            })
+
         prompt = self._build_prompt(
-            user_query, formatted_schema, db_description, instructions, memory_context
+            user_query, formatted_schema, db_description,
+            instructions, memory_context, database_type
         )
         self.messages.append({"role": "user", "content": prompt})
         completion_result = completion(
             model=Config.COMPLETION_MODEL,
             messages=self.messages,
             temperature=0,
-            top_p=1,
         )
 
         response = completion_result.choices[0].message.content
@@ -158,7 +169,8 @@ class AnalysisAgent(BaseAgent):
 
     def _build_prompt(   # pylint: disable=too-many-arguments, too-many-positional-arguments
         self, user_input: str, formatted_schema: str,
-        db_description: str, instructions, memory_context: str | None = None
+        db_description: str, instructions, memory_context: str | None = None,
+        database_type: str | None = None,
     ) -> str:
         """
         Build the prompt for Claude to analyze the query.
@@ -169,6 +181,7 @@ class AnalysisAgent(BaseAgent):
             db_description: Description of the database
             instructions: Custom instructions for the query
             memory_context: User and database memory context from previous interactions
+            database_type: Target database type (sqlite, postgresql, mysql, etc.)
 
         Returns:
             The formatted prompt for Claude
@@ -195,6 +208,8 @@ class AnalysisAgent(BaseAgent):
 
         prompt = f"""
             You must strictly follow the instructions below. Deviations will result in a penalty to your confidence score.
+
+            TARGET DATABASE: {database_type.upper() if database_type else 'UNKNOWN'}
 
             MANDATORY RULES:
             - Always explain if you cannot fully follow the instructions.
