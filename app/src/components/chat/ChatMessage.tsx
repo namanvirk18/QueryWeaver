@@ -227,7 +227,7 @@ const ChatMessage = ({ type, content, steps, queryData, analysisInfo, confirmati
                       </thead>
                       <tbody>
                         {queryData.map((row, index) => (
-                          <tr key={index} className="border-b border-border/50 hover:bg-muted/30">
+                          <tr key={index} className="border-b border-border hover:bg-muted">
                             {Object.values(row).map((value: any, cellIndex) => (
                               <td key={cellIndex} className="px-3 py-2 text-foreground whitespace-nowrap">
                                 {String(value)}

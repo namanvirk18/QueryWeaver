@@ -107,17 +107,25 @@ const DatabaseModal = ({ open, onOpenChange }: DatabaseModalProps) => {
       });
 
       if (!response.ok) {
+        // Try to parse error message from server for all error responses
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            throw new Error(errorData.error);
+          }
+        } catch (jsonError) {
+          // If JSON parsing fails, fall back to status-based messages
+        }
+
+        // Fallback error messages by status code
         const errorMessages: Record<number, string> = {
+          400: 'Invalid database connection URL.',
           401: 'Not authenticated. Please sign in to connect databases.',
           403: 'Access denied. You do not have permission to connect databases.',
+          409: 'Conflict with existing database connection.',
+          422: 'Invalid database connection parameters.',
           500: 'Server error. Please try again later.',
         };
-
-        // For 400, try to get server error message first
-        if (response.status === 400) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Invalid database connection URL.');
-        }
 
         throw new Error(errorMessages[response.status] || `Failed to connect to database (${response.status})`);
       }

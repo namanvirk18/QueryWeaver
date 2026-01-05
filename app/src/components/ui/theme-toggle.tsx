@@ -12,8 +12,9 @@ type Theme = "light" | "dark";
 const ThemeToggle = () => {
   const [theme, setTheme] = useState<Theme>(() => {
     try {
-      const savedTheme = localStorage.getItem("theme") as Theme;
-      return savedTheme || "dark";
+      const savedTheme = localStorage.getItem("theme");
+      // Normalize: only accept "light" or "dark", default to "dark"
+      return (savedTheme === "light" || savedTheme === "dark") ? savedTheme : "dark";
     } catch {
       return "dark";
     }
