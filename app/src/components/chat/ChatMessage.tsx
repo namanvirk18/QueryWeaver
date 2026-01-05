@@ -1,5 +1,5 @@
-import React from 'react';
-import { Database, Search, Code, MessageSquare, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Database, Search, Code, MessageSquare, AlertTriangle, Copy, Check } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,18 @@ interface ChatMessageProps {
 }
 
 const ChatMessage = ({ type, content, steps, queryData, analysisInfo, confirmationData, progress, user, onConfirm, onCancel }: ChatMessageProps) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyQuery = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
+  };
+
   if (type === 'confirmation') {
     const operationType = (confirmationData?.operationType ?? 'UNKNOWN').toUpperCase();
     const isHighRisk = ['DELETE', 'DROP', 'TRUNCATE'].includes(operationType);
@@ -157,9 +169,24 @@ const ChatMessage = ({ type, content, steps, queryData, analysisInfo, confirmati
 
               {hasSQL && (
                 <div className="-mx-2 px-2">
-                  <pre className="bg-gray-900 text-gray-200 p-3 rounded text-sm mb-3 font-mono whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                    <code className="language-sql">{content}</code>
-                  </pre>
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCopyQuery}
+                      className="absolute top-2 right-2 z-10 h-8 w-8 p-0 hover:bg-gray-800"
+                      title={copied ? "Copied!" : "Copy query"}
+                    >
+                      {copied ? (
+                        <Check className="w-4 h-4 text-green-400" />
+                      ) : (
+                        <Copy className="w-4 h-4 text-gray-400" />
+                      )}
+                    </Button>
+                    <pre className="bg-gray-900 text-gray-200 p-3 rounded text-sm mb-3 font-mono whitespace-pre-wrap break-words overflow-wrap-anywhere">
+                      <code className="language-sql">{content}</code>
+                    </pre>
+                  </div>
                 </div>
               )}
 
