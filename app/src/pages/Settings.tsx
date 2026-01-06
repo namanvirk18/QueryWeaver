@@ -30,6 +30,10 @@ const Settings = () => {
   const [isLoadingRules, setIsLoadingRules] = useState(true);
   const [initialRulesLoaded, setInitialRulesLoaded] = useState(false);
   const loadedRulesRef = useRef<string>(''); // Track the originally loaded rules
+  const currentRulesRef = useRef<string>(''); // Track the current rules value
+  const currentGraphIdRef = useRef<string | null>(null); // Track current database ID for unmount save
+  const useRulesFromDatabaseRef = useRef<boolean>(true); // Track toggle state for unmount
+  const initialRulesLoadedRef = useRef<boolean>(false); // Track loaded state for unmount
   const [useMemory, setUseMemory] = useState(() => {
     // Load from localStorage on init, default to true
     if (typeof window !== 'undefined') {
@@ -65,17 +69,21 @@ const Settings = () => {
   useEffect(() => {
     const loadRules = async () => {
       if (!selectedGraph) {
+        setRules('');
         setIsLoadingRules(false);
         setInitialRulesLoaded(false);
         loadedRulesRef.current = '';
+        currentGraphIdRef.current = null;
         return;
       }
+      
+      // Update the ref to track current database
+      currentGraphIdRef.current = selectedGraph.id;
       
       // Only fetch from database if toggle is enabled
       if (!useRulesFromDatabase) {
         setIsLoadingRules(false);
         setInitialRulesLoaded(true);
-        loadedRulesRef.current = rules; // Use current local rules
         return;
       }
       
@@ -96,42 +104,42 @@ const Settings = () => {
       } finally {
         setIsLoadingRules(false);
         setInitialRulesLoaded(true);
+        initialRulesLoadedRef.current = true;
       }
     };
     
     loadRules();
-  }, [selectedGraph, toast, useRulesFromDatabase]);
+  }, [selectedGraph?.id, toast, useRulesFromDatabase]);
 
-  // Save rules to backend whenever they change (debounced) - only when using database rules
+  // Update refs when toggle or rules change
   useEffect(() => {
-    // Don't save during initial load or if no graph selected or if not using database rules
-    if (!selectedGraph || isLoadingRules || !initialRulesLoaded || !useRulesFromDatabase) return;
-    
-    // Only save if rules actually changed from the loaded value
-    if (rules === loadedRulesRef.current) {
-      console.log('Rules unchanged, skipping save');
-      return;
-    }
-    
-    const timeoutId = setTimeout(async () => {
-      try {
-        await databaseService.updateUserRules(selectedGraph.id, rules);
-        loadedRulesRef.current = rules; // Update the ref to the new saved value
-        console.log('User rules saved to database');
-      } catch (error) {
-        console.error('Failed to save user rules:', error);
-        toast({
-          title: "Error",
-          description: "Failed to save user rules",
-          variant: "destructive",
-        });
+    useRulesFromDatabaseRef.current = useRulesFromDatabase;
+  }, [useRulesFromDatabase]);
+
+  useEffect(() => {
+    currentRulesRef.current = rules;
+  }, [rules]);
+
+  // Save rules when component unmounts (user navigates away from Settings)
+  useEffect(() => {
+    return () => {
+      // At unmount time, check if there are unsaved changes and save them
+      const graphId = currentGraphIdRef.current;
+      const loadedRules = loadedRulesRef.current;
+      const currentRules = currentRulesRef.current;
+      const shouldUseDb = useRulesFromDatabaseRef.current;
+      const isLoaded = initialRulesLoadedRef.current;
+      
+      if (graphId && shouldUseDb && currentRules !== loadedRules && isLoaded) {
+        // Save immediately on unmount if there are unsaved changes
+        console.log('Saving rules on unmount...', { graphId, length: currentRules.length });
+        databaseService.updateUserRules(graphId, currentRules)
+          .then(() => console.log('User rules saved on unmount to:', graphId))
+          .catch(err => console.error('Failed to save rules on unmount:', err));
       }
-    }, 1000); // Debounce 1 second
-
-    return () => clearTimeout(timeoutId);
-  }, [rules, selectedGraph, isLoadingRules, initialRulesLoaded, useRulesFromDatabase, toast]);
-
-
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty array - effect runs once on mount, cleanup runs once on unmount
 
   // Auto-save to localStorage whenever useMemory changes
   useEffect(() => {
@@ -162,6 +170,31 @@ const Settings = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleBackClick = async () => {
+    // Save rules before navigating away if there are unsaved changes
+    const graphId = currentGraphIdRef.current;
+    const loadedRules = loadedRulesRef.current;
+    const currentRules = currentRulesRef.current;
+    
+    if (graphId && useRulesFromDatabase && currentRules !== loadedRules && initialRulesLoaded) {
+      try {
+        console.log('Saving rules before navigation...', { graphId, length: currentRules.length });
+        await databaseService.updateUserRules(graphId, currentRules);
+        loadedRulesRef.current = currentRules; // Update to prevent unmount from saving again
+        console.log('User rules saved successfully');
+      } catch (error) {
+        console.error('Failed to save rules:', error);
+        toast({
+          title: "Error",
+          description: "Failed to save user rules",
+          variant: "destructive",
+        });
+      }
+    }
+    
+    navigate('/');
   };
 
   return (
@@ -266,7 +299,7 @@ const Settings = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate('/')}
+                onClick={handleBackClick}
                 className="text-gray-400 hover:text-white hover:bg-gray-700"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />

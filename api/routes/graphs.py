@@ -18,6 +18,7 @@ from api.core.text2sql import (
     get_schema,
     query_database,
     refresh_database_schema,
+    _graph_name,
 )
 from api.graph import get_user_rules, set_user_rules
 from api.auth.user_management import token_required
@@ -238,8 +239,11 @@ class UserRulesRequest(BaseModel):
 async def get_graph_user_rules(request: Request, graph_id: str):
     """Get user rules for the specified graph."""
     try:
-        full_graph_id = f"{request.state.user_id}_{graph_id}"
+        full_graph_id = _graph_name(request.state.user_id, graph_id)
+        logging.info("Getting user rules for graph: %s (full: %s)", graph_id, full_graph_id)
         user_rules = await get_user_rules(full_graph_id)
+        logging.info("Retrieved user rules length: %d", len(user_rules) if user_rules else 0)
+        logging.info("Retrieved user rules content: %s", repr(user_rules))
         return JSONResponse(content={"user_rules": user_rules})
     except GraphNotFoundError:
         return JSONResponse(content={"error": "Database not found"}, status_code=404)
@@ -255,7 +259,7 @@ async def update_graph_user_rules(request: Request, graph_id: str, data: UserRul
     try:
         logging.info("Received request to update user rules for graph: %s", graph_id)
         logging.info("User rules content length: %d", len(data.user_rules))
-        full_graph_id = f"{request.state.user_id}_{graph_id}"
+        full_graph_id = _graph_name(request.state.user_id, graph_id)
         logging.info("Full graph_id: %s", full_graph_id)
         await set_user_rules(full_graph_id, data.user_rules)
         logging.info("User rules updated successfully for graph: %s", graph_id)

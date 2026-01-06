@@ -75,7 +75,7 @@ async def set_user_rules(graph_id: str, user_rules: str) -> None:
     graph = db.select_graph(graph_id)
     await graph.query(
         """
-        MATCH (d:Database)
+        MERGE (d:Database)
         SET d.user_rules = $user_rules
         """,
         {"user_rules": user_rules}
