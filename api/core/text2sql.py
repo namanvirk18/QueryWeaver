@@ -58,7 +58,6 @@ class ConfirmRequest(BaseModel):
     sql_query: str
     confirmation: str = ""
     chat: list = []
-    use_user_rules: bool = True  # If True, fetch rules from database; if False, don't use rules
 
 
 def get_database_type_and_loader(db_url: str):
@@ -728,7 +727,7 @@ async def execute_destructive_operation(  # pylint: disable=too-many-statements
         if confirmation == "CONFIRM":
             try:
                 db_description, db_url = await get_db_description(graph_id)
-                
+
                 # Determine database type and get appropriate loader
                 _, loader_class = get_database_type_and_loader(db_url)
 
