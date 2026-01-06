@@ -217,7 +217,15 @@ const DatabaseModal = ({ open, onOpenChange }: DatabaseModalProps) => {
             Connect to Database
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            Connect to PostgreSQL or MySQL database using a connection URL or manual entry
+            Connect to PostgreSQL or MySQL database using a connection URL or manual entry.{" "}
+            <a
+              href="https://www.falkordb.com/privacy-policy/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              Privacy Policy
+            </a>
           </DialogDescription>
         </DialogHeader>
         
