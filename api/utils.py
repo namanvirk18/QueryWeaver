@@ -1,11 +1,66 @@
 """Utility functions for the text2sql API."""
-
-from typing import List
-
-from litellm import completion
-
+import json
+from typing import Any, Dict, List
 from api.config import Config
+from litellm import completion, batch_completion
 
+def create_combined_description(table_info: Dict[str, Dict[str, Any]], batch_size: int = 10) -> Dict[str, Dict[str, Any]]:
+    """
+    Create a combined description from a dictionary of table descriptions.
+
+    Args:
+        table_info (Dict[str, Dict[str, Any]]): Mapping of table names to their metadata.
+    Returns:
+        Dict[str, Dict[str, Any]]: Updated mapping containing descriptions.
+    """
+    if not isinstance(table_info, dict):
+        raise TypeError("table_info must be a dictionary keyed by table name.")
+
+    messages_list = []
+    table_keys = []
+    
+    system_prompt = (
+        "You are a database table description generator. "
+        "Generate ONE concise sentence starting with the table name, describing what the table stores, "
+        "using present tense. Do not add explanations."
+    )
+    
+    user_prompt_template = (
+        "Table Name: {table_name}\n"
+        "Table Schema: {table_prop}\n"
+        "Provide a concise description of this table."
+    )
+    
+    for table_name, table_prop in table_info.items():
+        table_prop.pop("col_descriptions") # The col_descriptions property is duplicated in the schema (columns has it)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt_template.format(table_name=table_name, table_prop=json.dumps(table_prop))},
+        ]
+
+        messages_list.append(messages)
+        table_keys.append(table_name)
+
+    for batch_start in range(0, len(messages_list), batch_size):
+        batch_messages = messages_list[batch_start : batch_start + batch_size]
+        response = batch_completion(
+            model=Config.COMPLETION_MODEL,
+            messages=batch_messages,
+            temperature=0,
+            max_tokens=50,
+        )
+        
+        for offset, batch_response in enumerate(response):
+            table_index = batch_start + offset
+            if table_index >= len(table_keys):
+                break
+            table_name = table_keys[table_index]
+            if isinstance(batch_response, Exception):
+                table_info[table_name]["description"] = table_name
+            else:
+                table_info[table_name]["description"] = batch_response.choices[0].message["content"].strip()
+    
+    return table_info
 
 def generate_db_description(
     db_name: str,
