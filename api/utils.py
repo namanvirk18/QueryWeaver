@@ -15,6 +15,7 @@ def create_combined_description(
 
     Args:
         table_info (Dict[str, Dict[str, Any]]): Mapping of table names to their metadata.
+        batch_size (int): Number of tables to process per batch when calling the LLM (default: 10).
     Returns:
         Dict[str, Dict[str, Any]]: Updated mapping containing descriptions.
     """
