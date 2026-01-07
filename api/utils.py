@@ -66,7 +66,8 @@ def create_combined_description(  # pylint: disable=too-many-locals
 
     for table_name, table_prop in table_info.items():
         # The col_descriptions property is duplicated in the schema (columns has it)
-        table_prop.pop("col_descriptions")
+        table_prop = table_prop.copy()
+        table_prop.pop("col_descriptions", None)
         messages = [
             {"role": "system", "content": system_prompt},
             {
