@@ -1,23 +1,49 @@
 """Utility functions for the text2sql API."""
 import json
-from typing import Any, Dict, List
+from typing import Dict, List, Optional, TypedDict
 
 from litellm import completion, batch_completion
 
 from api.config import Config
 
 
-def create_combined_description(
-    table_info: Dict[str, Dict[str, Any]], batch_size: int = 10
-) -> Dict[str, Dict[str, Any]]:
+class ForeignKeyInfo(TypedDict):
+    """Foreign key constraint information."""
+    constraint_name: str
+    column: str
+    referenced_table: str
+    referenced_column: str
+
+
+class ColumnInfo(TypedDict):
+    """Column metadata information."""
+    type: str
+    null: str
+    key: str
+    description: str
+    default: Optional[str]
+    sample_values: List[str]
+
+
+class TableInfo(TypedDict):
+    """Table metadata information."""
+    description: str
+    columns: Dict[str, ColumnInfo]
+    foreign_keys: List[ForeignKeyInfo]
+    col_descriptions: List[str]
+
+
+def create_combined_description(  # pylint: disable=too-many-locals
+    table_info: Dict[str, TableInfo], batch_size: int = 10
+) -> Dict[str, TableInfo]:
     """
     Create a combined description from a dictionary of table descriptions.
 
     Args:
-        table_info (Dict[str, Dict[str, Any]]): Mapping of table names to their metadata.
+        table_info (Dict[str, TableInfo]): Mapping of table names to their metadata.
         batch_size (int): Number of tables to process per batch when calling the LLM (default: 10).
     Returns:
-        Dict[str, Dict[str, Any]]: Updated mapping containing descriptions.
+        Dict[str, TableInfo]: Updated mapping containing descriptions.
     """
     if not isinstance(table_info, dict):
         raise TypeError("table_info must be a dictionary keyed by table name.")
