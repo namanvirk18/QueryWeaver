@@ -1,5 +1,5 @@
-import React from 'react';
-import { Database, Search, Code, MessageSquare, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Database, Search, Code, MessageSquare, AlertTriangle, Copy, Check } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,18 @@ interface ChatMessageProps {
 }
 
 const ChatMessage = ({ type, content, steps, queryData, analysisInfo, confirmationData, progress, user, onConfirm, onCancel }: ChatMessageProps) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyQuery = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
+  };
+
   if (type === 'confirmation') {
     const operationType = (confirmationData?.operationType ?? 'UNKNOWN').toUpperCase();
     const isHighRisk = ['DELETE', 'DROP', 'TRUNCATE'].includes(operationType);
@@ -64,8 +76,8 @@ const ChatMessage = ({ type, content, steps, queryData, analysisInfo, confirmati
                       This operation will perform a <span className={`font-semibold ${isHighRisk ? 'text-red-400' : 'text-yellow-400'}`}>{operationType}</span> query:
                     </p>
                     {confirmationData?.sqlQuery && (
-                      <div className="bg-gray-900 border border-gray-700 rounded p-3 overflow-x-auto">
-                        <pre className="text-sm font-mono text-gray-200">
+                      <div className="bg-gray-900 border border-gray-700 rounded p-3">
+                        <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words overflow-wrap-anywhere">
                           <code className="language-sql">{confirmationData.sqlQuery}</code>
                         </pre>
                       </div>
@@ -156,10 +168,25 @@ const ChatMessage = ({ type, content, steps, queryData, analysisInfo, confirmati
               </div>
 
               {hasSQL && (
-                <div className="overflow-x-auto -mx-2 px-2">
-                  <pre className="bg-gray-900 text-gray-200 p-3 rounded text-sm mb-3 w-fit min-w-full font-mono">
-                    <code className="language-sql">{content}</code>
-                  </pre>
+                <div className="-mx-2 px-2">
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCopyQuery}
+                      className="absolute top-2 right-2 z-10 h-8 w-8 p-0 hover:bg-gray-800"
+                      title={copied ? "Copied!" : "Copy query"}
+                    >
+                      {copied ? (
+                        <Check className="w-4 h-4 text-green-400" />
+                      ) : (
+                        <Copy className="w-4 h-4 text-gray-400" />
+                      )}
+                    </Button>
+                    <pre className="bg-gray-900 text-gray-200 p-3 rounded text-sm mb-3 font-mono whitespace-pre-wrap break-words overflow-wrap-anywhere">
+                      <code className="language-sql">{content}</code>
+                    </pre>
+                  </div>
                 </div>
               )}
 
@@ -219,7 +246,7 @@ const ChatMessage = ({ type, content, steps, queryData, analysisInfo, confirmati
                       <thead className="sticky top-0 bg-gray-800 z-10">
                         <tr className="border-b border-gray-700">
                           {Object.keys(queryData[0]).map((column) => (
-                            <th key={column} className="text-left px-3 py-2 text-gray-300 font-semibold bg-gray-800 whitespace-nowrap">
+                            <th key={column} className="text-left px-3 py-2 text-gray-300 font-semibold bg-gray-800 break-words" style={{ maxWidth: '300px', minWidth: '100px' }}>
                               {column}
                             </th>
                           ))}
@@ -229,7 +256,7 @@ const ChatMessage = ({ type, content, steps, queryData, analysisInfo, confirmati
                         {queryData.map((row, index) => (
                           <tr key={index} className="border-b border-gray-700/50 hover:bg-gray-700/30">
                             {Object.values(row).map((value: any, cellIndex) => (
-                              <td key={cellIndex} className="px-3 py-2 text-gray-200 whitespace-nowrap">
+                              <td key={cellIndex} className="px-3 py-2 text-gray-200 break-words" style={{ maxWidth: '300px', minWidth: '100px' }}>
                                 {String(value)}
                               </td>
                             ))}
