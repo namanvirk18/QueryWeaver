@@ -265,7 +265,7 @@ const Settings = () => {
       } catch (error) {
         toast({
           title: "Error",
-          description: "Failed to save user rules",
+          description: error instanceof Error ? error.message : "Failed to save user rules",
           variant: "destructive",
         });
       }
@@ -583,7 +583,7 @@ const Settings = () => {
                         } catch (error) {
                           toast({
                             title: "Error",
-                            description: "Failed to save user rules",
+                            description: error instanceof Error ? error.message : "Failed to save user rules",
                             variant: "destructive",
                           });
                         }

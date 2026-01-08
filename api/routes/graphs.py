@@ -255,6 +255,13 @@ async def get_graph_user_rules(request: Request, graph_id: str):
 async def update_graph_user_rules(request: Request, graph_id: str, data: UserRulesRequest):
     """Update user rules for the specified graph."""
     try:
+        # Prevent modifying rules for demo databases
+        if GENERAL_PREFIX and graph_id.startswith(GENERAL_PREFIX):
+            return JSONResponse(
+                content={"error": "Rules cannot be modified for demo databases"},
+                status_code=403
+            )
+
         logging.info(
             "Received request to update user rules, content length: %d", len(data.user_rules)
         )

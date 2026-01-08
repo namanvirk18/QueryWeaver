@@ -326,7 +326,7 @@ export class DatabaseService {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to update user rules:', errorData);
-        throw new Error('Failed to update user rules');
+        throw new Error(errorData.error || 'Failed to update user rules');
       }
       
       const result = await response.json();
