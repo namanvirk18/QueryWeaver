@@ -1,15 +1,15 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { useDatabase } from "@/contexts/DatabaseContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChat } from "@/contexts/ChatContext";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import ChatMessage from "./ChatMessage";
 import QueryInput from "./QueryInput";
 import SuggestionCards from "../SuggestionCards";
 import { ChatService } from "@/services/chat";
-import type { ConversationMessage } from "@/types/api";
 
 interface ChatMessageData {
   id: string;
@@ -53,10 +53,9 @@ const ChatInterface = ({
 }: ChatInterfaceProps) => {
   const { toast } = useToast();
   const { selectedGraph } = useDatabase();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const { messages, setMessages, conversationHistory, isProcessing, setIsProcessing } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const conversationHistory = useRef<ConversationMessage[]>([]);
 
   // Auto-scroll to bottom function
   const scrollToBottom = () => {
@@ -80,35 +79,12 @@ const ChatInterface = ({
   );
 
   const { user } = useAuth();
-  const [messages, setMessages] = useState<ChatMessageData[]>([
-    {
-      id: "1",
-      type: "ai",
-      content: "Hello! Describe what you'd like to ask your database",
-      timestamp: new Date(),
-    }
-  ]);
 
   const suggestions = [
     "Show me five customers",
     "Show me the top customers by revenue", 
     "What are the pending orders?"
   ];
-
-  // Reset conversation when the selected graph changes to avoid leaking
-  // conversation history between different databases.
-  useEffect(() => {
-    // Clear in-memory conversation history and reset messages to the greeting
-    conversationHistory.current = [];
-    setMessages([
-      {
-        id: "1",
-        type: "ai",
-        content: "Hello! Describe what you'd like to ask your database",
-        timestamp: new Date(),
-      }
-    ]);
-  }, [selectedGraph?.id]);
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
