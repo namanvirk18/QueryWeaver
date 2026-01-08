@@ -261,7 +261,7 @@ async def update_graph_user_rules(request: Request, graph_id: str, data: UserRul
                 content={"error": "Rules cannot be modified for demo databases"},
                 status_code=403
             )
-        
+
         logging.info(
             "Received request to update user rules, content length: %d", len(data.user_rules)
         )
