@@ -31,7 +31,7 @@ class TestHSTSHeader:
     def test_hsts_header_on_api_endpoints(self, client):
         """Test that the HSTS header is present on API endpoints."""
         # Test on graphs endpoint
-        response = client.get("/api/graphs")
+        response = client.get("/graphs")
 
         # Verify HSTS header is present
         assert "strict-transport-security" in response.headers
