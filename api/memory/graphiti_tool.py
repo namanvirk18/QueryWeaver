@@ -47,10 +47,12 @@ def extract_embedding_model_name(full_model_name: str) -> str:
 class MemoryTool:
     """Memory management tool for handling user memories and interactions."""
 
+    MEMORY_TTL_SECONDS = 7 * 24 * 60 * 60  # 1 week
+
     def __init__(self, user_id: str, graph_id: str):
         # Create FalkorDB driver with user-specific database
-        user_memory_db = f"{user_id}-memory"
-        falkor_driver = FalkorDriver(falkor_db=db, database=user_memory_db)
+        self.memory_db_name = f"{user_id}-memory"
+        falkor_driver = FalkorDriver(falkor_db=db, database=self.memory_db_name)
 
        
         # Create Graphiti client with Azure OpenAI configuration
@@ -59,6 +61,13 @@ class MemoryTool:
         self.user_id = user_id
         self.graph_id = graph_id
 
+
+    async def _refresh_ttl(self) -> None:
+        """Set a 1-week TTL on the memory graph key using Redis EXPIRE."""
+        try:
+            await db.execute_command("EXPIRE", self.memory_db_name, self.MEMORY_TTL_SECONDS)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.warning("Failed to refresh TTL for %s: %s", self.memory_db_name, e)
 
     @classmethod
     async def create(cls, user_id: str, graph_id: str, use_direct_entities: bool = True) -> "MemoryTool":
@@ -71,6 +80,8 @@ class MemoryTool:
         vector_size = Config.EMBEDDING_MODEL.get_vector_size()
         driver = self.graphiti_client.driver
         await driver.execute_query(f"CREATE VECTOR INDEX FOR (p:Query) ON (p.embeddings) OPTIONS {{dimension:{vector_size}, similarityFunction:'euclidean'}}")
+
+        await self._refresh_ttl()
 
         return self
 
