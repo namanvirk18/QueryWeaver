@@ -10,6 +10,8 @@ import uuid
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 
+from redis import RedisError
+
 # Import Azure OpenAI components
 from openai import AsyncAzureOpenAI
 
@@ -72,7 +74,7 @@ class MemoryTool:
         """Set a TTL on the memory graph key using Redis EXPIRE."""
         try:
             await db.execute_command("EXPIRE", self.memory_db_name, self.MEMORY_TTL_SECONDS)
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except RedisError as e:
             logging.warning("Failed to refresh TTL for %s: %s", self.memory_db_name, e)
 
     @classmethod
