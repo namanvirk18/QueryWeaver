@@ -47,7 +47,13 @@ def extract_embedding_model_name(full_model_name: str) -> str:
 class MemoryTool:
     """Memory management tool for handling user memories and interactions."""
 
-    MEMORY_TTL_SECONDS = 7 * 24 * 60 * 60  # 1 week
+    # Optional TTL (in seconds) for the memory graph key. Set via MEMORY_TTL_SECONDS
+    # env var to enable automatic expiry (e.g. 604800 for 1 week). Unset = no expiry.
+    MEMORY_TTL_SECONDS: Optional[int] = (
+        int(os.environ["MEMORY_TTL_SECONDS"])
+        if os.environ.get("MEMORY_TTL_SECONDS")
+        else None
+    )
 
     def __init__(self, user_id: str, graph_id: str):
         # Create FalkorDB driver with user-specific database
@@ -63,7 +69,7 @@ class MemoryTool:
 
 
     async def _refresh_ttl(self) -> None:
-        """Set a 1-week TTL on the memory graph key using Redis EXPIRE."""
+        """Set a TTL on the memory graph key using Redis EXPIRE."""
         try:
             await db.execute_command("EXPIRE", self.memory_db_name, self.MEMORY_TTL_SECONDS)
         except Exception as e:  # pylint: disable=broad-exception-caught
@@ -81,7 +87,8 @@ class MemoryTool:
         driver = self.graphiti_client.driver
         await driver.execute_query(f"CREATE VECTOR INDEX FOR (p:Query) ON (p.embeddings) OPTIONS {{dimension:{vector_size}, similarityFunction:'euclidean'}}")
 
-        await self._refresh_ttl()
+        if cls.MEMORY_TTL_SECONDS is not None:
+            await self._refresh_ttl()
 
         return self
 
