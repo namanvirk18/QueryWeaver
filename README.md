@@ -2,7 +2,7 @@
 
 <img
   alt="QueryWeaver logo"
-  src="https://raw.githubusercontent.com/namanvirk18/QueryWeaver/main/assets/queryweaver.jpg"
+  src="https://github.com/namanvirk18/QueryWeaver/blob/main/assets/queryweaver.jpg?raw=true"
   width="300"
 >
 
