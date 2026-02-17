@@ -2,7 +2,7 @@
 
 ![QueryWeaver logo](https://github.com/namanvirk18/QueryWeaver/blob/main/assets/queryweaver.jpg?raw=true)
 
-<p style="font-size: 1.3em; font-weight: 600; margin: 10px 0;">REST API · MCP · Graph-powered</p>
+### REST API · MCP · Graph-powered
 
 <p style="max-width: 900px; margin: 10px auto; text-align: left;">QueryWeaver is an open-source Text2SQL tool that converts plain-English questions into SQL using graph-powered schema understanding.</p>
 
