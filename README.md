@@ -1,10 +1,6 @@
 <div align="center">
 
-<img
-  alt="QueryWeaver logo"
-  src="https://github.com/namanvirk18/QueryWeaver/blob/main/assets/queryweaver.jpg?raw=true"
-  width="300"
->
+![QueryWeaver logo](https://github.com/namanvirk18/QueryWeaver/blob/main/assets/queryweaver.jpg?raw=true)
 
 <p style="font-size: 1.3em; font-weight: 600; margin: 10px 0;">REST API · MCP · Graph-powered</p>
 
